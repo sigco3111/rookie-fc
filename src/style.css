@@ -33,3 +33,23 @@ button { font: inherit; }
 .file-button { padding: 8px 16px; border-radius: 10px; border: 1px solid var(--ds-ink); background: var(--ds-ink); color: #fff; cursor: pointer; }
 .file-button[data-variant="secondary"] { background: transparent; color: var(--ds-ink); border-color: var(--ds-hairline); }
 .file-button:disabled { opacity: .45; cursor: default; }
+
+/* 게임 화면 테마 */
+:root { --ds-page: #0f1b2d; --ds-ink: #f2f5fa; --ds-ink-2: #9fb0c7; --ds-hairline: #26385a; --rs-accent: #ffd84a; --rs-panel: #17263f; }
+html, body { background: radial-gradient(1200px 600px at 50% -10%, #1d3a63 0%, #0f1b2d 60%) fixed; min-height: 100%; }
+.ui-card { max-width: 480px; padding: 14px 14px 56px; }
+.ui-title { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin: 4px 0 0; color: var(--rs-accent); }
+.ui-fact { margin: 2px 0 10px; font-size: 14px; }
+.ui-callout { border: 0; background: transparent; padding: 0; margin: 0 0 10px; font-size: 12px; }
+.ui-group { background: var(--rs-panel); border: 1px solid var(--ds-hairline); border-radius: 18px; padding: 14px 14px 10px; margin: 12px 0; }
+.ui-group h2 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+.ui-facts > div { border-color: var(--ds-hairline); }
+.rs-bar > div { background: #0b1424; height: 10px; border-radius: 6px; }
+.rs-bar i { background: linear-gradient(90deg, #3fb6ff, #7be38c); }
+.rs-input { border-color: var(--ds-hairline); background: #0b1424; color: var(--ds-ink); }
+.file-button { background: var(--rs-accent); color: #1a2338; border-color: var(--rs-accent); font-weight: 700; border-radius: 14px; }
+.file-button[data-variant="secondary"] { background: transparent; color: var(--ds-ink); border-color: #3a5282; font-weight: 500; }
+.rs-table th, .rs-table td { border-color: var(--ds-hairline); }
+.rs-me td { background: rgba(255, 216, 74, .16); }
+.rs-info { margin: 18px 0; color: var(--ds-ink-2); font-size: 13px; } .rs-info summary { cursor: pointer; padding: 8px 0; }
+.ui-closing { font-size: 12px; }

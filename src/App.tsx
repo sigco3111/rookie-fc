@@ -95,7 +95,7 @@ export function App() {
     const reset = () => { if (saved.ready) setSave(initial); };
 
     return <FileCard>
-        <Header title="루키나인 축구, 첫 플레이 버전" fact="7대7, 유스 3시즌, 1군 팀 조작" intro="유스에서 한 선수를 키우고, 승격하면 팀 전체를 조작하는 첫 시험 버전이다. 숫자와 규칙은 모두 제안값이고 확정된 것은 기획 문서의 확정 표뿐이다." />
+        <Header title="루키나인 축구" fact="유스에서 키워 1군으로. 7대7" />
         <Callout>{saved.message || '진행은 이 기기와 이 브라우저에 저장된다.'}</Callout>
         {playing && <Group label={playing.kind === 'pro' ? '1군 경기: 팀 전체 조작' : `유스 ${s.season}시즌 ${s.game + 1}경기`} heading>
             <MatchView key={key} stats={s.stats} pos={s.pos} oppStr={playing.oppStr} teamControl={playing.team} halfLen={HALF} onFinish={finish} />
@@ -141,13 +141,13 @@ export function App() {
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
         </Group>}
         {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
-        <Group label="이 버전의 한계" heading>
+        <details className="rs-info"><summary>이 버전의 한계와 출처</summary><Group label="이 버전의 한계" heading>
             <Facts items={[
                 { label: '모델과 동작', value: '실제 3D. Kenney 3번 캐릭터 모델, 달리기와 대기는 Kenney 동작, 킥은 CMU 모션캡처를 3번 뼈대에 옮겨 입힌 것. 육성 화면의 선수는 Kenney 4번(Mini Characters, CC0)' },
-                { label: '없는 것', value: '반칙, 오프사이드, 헤딩, 프리킥, 1군 리그, 이적, 실제 물리 충돌. 공은 단순 계산이다' },
+                { label: '없는 것', value: '반칙, 오프사이드, 헤딩, 프리킥, 이적과 재정, 실제 물리 충돌. 공은 단순 계산이다' },
                 { label: '미확인', value: '여러 기종 휴대폰 성능, 장시간 플레이 밸런스' },
             ]} />
-        </Group>
+        </Group></details>
         <Closing>시험 버전. 규칙과 수치는 바뀔 수 있다.</Closing>
     </FileCard>;
 }
