@@ -14,6 +14,14 @@ function load() {
         const files = fflate.unzipSync(new Uint8Array(await (await fetch(zipUrl)).arrayBuffer()));
         const bm = await createImageBitmap(new Blob([files['colormap.png']], { type: 'image/png' }));
         const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; c.getContext('2d')!.drawImage(bm, 0, 0);
+        { // 승격 목업의 빨간 유니폼에 맞춰 셔츠에 쓰인 보라, 초록 계열 색(채도 높은 것, 음영 유지)만 빨강으로 바꾼다. 피부, 머리, 바지는 그대로.
+            const cx2 = c.getContext('2d')!; const id = cx2.getImageData(0, 0, c.width, c.height); const d = id.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), df = mx - mn; if (mx < 0.1 || df / mx < 0.38) continue;
+                let h = mx === r ? ((g - b) / df) % 6 : mx === g ? (b - r) / df + 2 : (r - g) / df + 4; h *= 60; if (h < 0) h += 360;
+                if ((h >= 250 && h <= 290) || (h >= 130 && h <= 175)) { const k = mx / 0.9; d[i] = Math.min(255, 207 * k * 0.95 + 20 * k); d[i + 1] = Math.min(255, 83 * k); d[i + 2] = Math.min(255, 79 * k); }
+            }
+            cx2.putImageData(id, 0, 0); }
         const tex = new T.CanvasTexture(c); tex.flipY = false; tex.colorSpace = T.SRGBColorSpace; tex.magFilter = T.NearestFilter;
         const ld = new GLTFLoader(); const models: any = {};
         for (const n of LOOKS) { const f = files[n + '.glb']; models[n] = await ld.parseAsync(f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength), ''); }
