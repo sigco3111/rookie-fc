@@ -156,8 +156,17 @@ export function App() {
             <Table lg={s.league} />
         </Group>}
         {!playing && s.phase === 'leagueEnd' && s.league && <Group label="1군 첫 시즌 종료" heading>
-            <Facts items={[{ label: '최종 순위', value: `${sorted(s.league.teams).findIndex(t => t.id === 0) + 1}위 / 8팀` }, { label: '직접 뛴 경기', value: `${s.league.log.filter(x => x.played).length}경기, 골 ${s.league.log.reduce((a, c) => a + c.goals, 0)}, 도움 ${s.league.log.reduce((a, c) => a + c.assists, 0)}` }, { label: '이 버전의 끝', value: '시즌 기록 보관과 다음 시즌은 다음 버전에서 만든다' }]} />
+            {(() => { const so = sorted(s.league.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; return <>
+                <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={96} /></div>
+                <div className="rs-score"><span>{rk}위</span><i>/ 8팀</i></div>
+                <div className="rs-tiles">
+                    <div className="rs-tile"><b>{pts(me)}</b><small>승점</small></div>
+                    <div className="rs-tile"><b>{s.league.log.filter(x => x.played).length}</b><small>직접 뛴 경기</small></div>
+                    <div className="rs-tile"><b>{s.league.log.reduce((a, c) => a + c.goals, 0)} / {s.league.log.reduce((a, c) => a + c.assists, 0)}</b><small>골 / 도움</small></div>
+                </div></>; })()}
+            <p className="rs-hint">이 버전은 여기까지. 다음 시즌은 아직 없다.</p>
             <Table lg={s.league} />
+            <Btn onClick={startLeague}>같은 선수로 리그 다시 도전</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
         </Group>}
         {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
