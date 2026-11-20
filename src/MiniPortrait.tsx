@@ -23,7 +23,7 @@ function load() {
             }
             cx2.putImageData(id, 0, 0); }
         const tex = new T.CanvasTexture(c); tex.flipY = false; tex.colorSpace = T.SRGBColorSpace; tex.magFilter = T.NearestFilter;
-        const ld = new GLTFLoader(); const models: any = {};
+        const ld = new GLTFLoader(); ld.manager.setURLModifier((u: string) => u.endsWith('colormap.png') ? 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' : u); const models: any = {};
         for (const n of LOOKS) { const f = files[n + '.glb']; models[n] = await ld.parseAsync(f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength), ''); }
         return { models, tex, base: c };
     })();
