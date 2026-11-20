@@ -1,9 +1,9 @@
 // @ts-nocheck
 // Kenney 3번 캐릭터(characterMedium) 3D 모델 불러오기, 달리기/대기 동작, CMU 모션캡처 킥 동작 연결.
-import * as T from './vendor/three.module.js';
-import { FBXLoader } from './vendor/FBXLoader.js';
-import * as SU from './vendor/SkeletonUtils.js';
-import * as fflate from './vendor/fflate.module.js';
+import * as T from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import * as SU from 'three/examples/jsm/utils/SkeletonUtils.js';
+import * as fflate from 'fflate';
 import zipUrl from './models/chars.zip?url';
 import homeUrl from './models/skin_home.png?url';
 import awayUrl from './models/skin_away.png?url';
