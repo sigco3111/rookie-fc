@@ -72,3 +72,6 @@ html { background-color: #0f1b2d; }
 
 .rs-mid { text-align: center; margin: 0 0 8px; }
 .rs-bar-w { grid-template-columns: 74px 1fr 56px; }
+
+.rs-vs { grid-template-columns: 1fr auto 1fr; align-items: center; }
+.rs-vsm { font-weight: 800; color: var(--ds-ink-2); font-size: 18px; }

@@ -147,7 +147,11 @@ export function App() {
         </Group>}
         {!playing && s.phase === 'league' && s.league && <Group label={`1군 리그 ${s.league.round + 1}/14라운드`} heading>
             {s.league.lastMsg && <Callout>지난 경기: {s.league.lastMsg}</Callout>}
-            <Facts items={[{ label: '다음 상대', value: `${s.league.teams[myFixture(s.league)].n} (강함 ${s.league.teams[myFixture(s.league)].str})` }, { label: '내 구단 강함', value: `${s.league.teams[0].str}` }]} />
+            <div className="rs-tiles rs-vs">
+                <div className="rs-tile"><b>{s.league.teams[0].str}</b><small>우리 구단 강함</small></div>
+                <div className="rs-vsm">VS</div>
+                <div className="rs-tile"><b>{s.league.teams[myFixture(s.league)].str}</b><small>{s.league.teams[myFixture(s.league)].n}</small></div>
+            </div>
             <div className="rs-row"><Btn onClick={playRound}>직접 뛰기</Btn><Btn kind="secondary" onClick={autoRound}>자동 진행</Btn></div>
             <Table lg={s.league} />
         </Group>}
