@@ -55,3 +55,4 @@ html, body { background: radial-gradient(1200px 600px at 50% -10%, #1d3a63 0%, #
 .rs-info { margin: 18px 0; color: var(--ds-ink-2); font-size: 13px; } .rs-info summary { cursor: pointer; padding: 8px 0; }
 .ui-closing { font-size: 12px; }
 button, input { font-family: RSKR, system-ui, sans-serif; }
+.rs-input { width: 100%; max-width: 100%; }
