@@ -7,7 +7,7 @@ import * as SU from 'three/examples/jsm/utils/SkeletonUtils.js';
 import * as fflate from 'fflate';
 import zipUrl from './models/mini.zip?url';
 
-export const LOOKS = ['male-a', 'male-c', 'male-e', 'female-b', 'female-c', 'female-e'];
+export const LOOKS = ['male-a', 'male-c', 'male-e', 'female-a', 'female-c', 'female-e'];
 let cache: Promise<any> | null = null;
 function load() {
     if (!cache) cache = (async () => {
@@ -30,7 +30,8 @@ export function MiniPortrait({ look, size = 160 }: { look: number; size?: number
         const cam = new T.PerspectiveCamera(30, 1 / 1.25, 0.1, 50);
         load().then(({ models, tex }) => {
             if (dead) return; const src = models[LOOKS[look]]; const m = SU.clone(src.scene);
-            m.traverse((o: any) => { if (o.isMesh) { o.frustumCulled = false; o.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.9 }); } });
+            m.traverse((o: any) => { if (o.isMesh) { const TH = 0.45; // female-a 팔 바깥 가는 막대(폭 0.45 초과)만 숨김, 원래 외형은 유지
+ if (o.name === 'body-mesh') { const g = o.geometry.clone(); const px = g.attributes.position; const idx = g.index!; const keep: number[] = []; for (let i = 0; i < idx.count; i += 3) { const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2); if (Math.max(Math.abs(px.getX(a)), Math.abs(px.getX(b)), Math.abs(px.getX(c))) <= TH) keep.push(a, b, c); } g.setIndex(keep); o.geometry = g; } o.frustumCulled = false; o.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.9 }); } });
             const bb = new T.Box3().setFromObject(m, true); const h = bb.max.y - bb.min.y; const k = 1.8 / h; m.scale.multiplyScalar(k); m.updateMatrixWorld(true);
             const bb2 = new T.Box3().setFromObject(m, true); m.position.y -= bb2.min.y; m.position.x -= (bb2.min.x + bb2.max.x) / 2; sc.add(m);
             cam.position.set(0, 1.0, 5.2); cam.lookAt(0, 0.9, 0);
