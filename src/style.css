@@ -68,3 +68,4 @@ html { background-color: #0f1b2d; }
 .rs-grow strong { width: 100%; font-size: 14px; color: var(--ds-ink-2); font-weight: 600; }
 .rs-chip { background: rgba(255, 216, 74, 0.16); border: 1px solid var(--rs-accent); color: var(--rs-accent); border-radius: 999px; padding: 4px 12px; font-size: 15px; white-space: nowrap; }
 .rs-chip-trust { background: rgba(80, 160, 255, 0.14); border-color: #5aa0ff; color: #9cc8ff; }
+.rs-bars { gap: 4px; margin: 8px 0; }

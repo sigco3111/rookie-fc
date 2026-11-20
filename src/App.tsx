@@ -110,7 +110,7 @@ export function App() {
             <Btn onClick={() => set({ phase: 'home', trained: false })}>유스팀 입단</Btn>
         </Group>}
         {!playing && s.phase === 'home' && <Group label={`${s.name} 유스 ${s.season}시즌 ${s.game + 1}/${MATCHES_PER_SEASON}경기`} heading>
-            <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={120} /></div>
+            <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={88} /></div>
             <div className="rs-tiles">
                 <div className="rs-tile"><b>{s.trust}</b><small>감독 신뢰 / 100</small></div>
                 <div className="rs-tile"><b>{44 + (s.season - 1) * 5 + s.game * 3}</b><small>다음 상대 강함</small></div>
