@@ -57,3 +57,14 @@ html, body { background: radial-gradient(1200px 600px at 50% -10%, #1d3a63 0%, #
 button, input { font-family: RSKR, system-ui, sans-serif; }
 .rs-input { width: 100%; max-width: 100%; }
 html { background-color: #0f1b2d; }
+
+.rs-score { display: flex; justify-content: center; align-items: baseline; gap: 14px; font-size: 52px; font-weight: 800; line-height: 1.1; margin: 4px 0 16px; }
+.rs-score i { font-style: normal; color: var(--ds-ink-2); font-size: 36px; }
+.rs-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.rs-tile { background: #0b1424; border: 1px solid var(--ds-hairline); border-radius: 12px; padding: 8px 4px; text-align: center; }
+.rs-tile b { display: block; font-size: 22px; }
+.rs-tile small { color: var(--ds-ink-2); font-size: 13px; white-space: nowrap; }
+.rs-grow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.rs-grow strong { width: 100%; font-size: 14px; color: var(--ds-ink-2); font-weight: 600; }
+.rs-chip { background: rgba(255, 216, 74, 0.16); border: 1px solid var(--rs-accent); color: var(--rs-accent); border-radius: 999px; padding: 4px 12px; font-size: 15px; white-space: nowrap; }
+.rs-chip-trust { background: rgba(80, 160, 255, 0.14); border-color: #5aa0ff; color: #9cc8ff; }

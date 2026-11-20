@@ -118,7 +118,12 @@ export function App() {
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
         </Group>}
         {!playing && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
-            <Facts items={[{ label: '점수', value: `${s.last.score[0]} : ${s.last.score[1]}` }, { label: '내 평점', value: s.last.rating.toFixed(1) }, { label: '활약', value: `골 ${s.last.goals}, 도움 ${s.last.assists}, 슛 ${s.last.shots}, 패스 ${s.last.passOk}/${s.last.passAtt}, 태클 ${s.last.tackles}` }, { label: '감독 신뢰', value: `${s.last.trustD >= 0 ? '+' : ''}${s.last.trustD}` }, { label: '성장', value: `${s.last.grew} +1` }]} />
+            <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={120} /></div>
+            <div className="rs-score"><span>{s.last.score[0]}</span><i>:</i><span>{s.last.score[1]}</span></div>
+            <div className="rs-tiles">
+                {([['평점', s.last.rating.toFixed(1)], ['골', String(s.last.goals)], ['도움', String(s.last.assists)], ['슛', String(s.last.shots)], ['패스', `${s.last.passOk}/${s.last.passAtt}`], ['태클', String(s.last.tackles)]] as [string, string][]).map(([k, v]) => <div key={k} className="rs-tile"><b>{v}</b><small>{k}</small></div>)}
+            </div>
+            <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
         {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
