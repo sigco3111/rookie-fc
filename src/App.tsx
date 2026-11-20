@@ -111,10 +111,14 @@ export function App() {
         </Group>}
         {!playing && s.phase === 'home' && <Group label={`${s.name} 유스 ${s.season}시즌 ${s.game + 1}/${MATCHES_PER_SEASON}경기`} heading>
             <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={120} /></div>
-            <Facts items={[{ label: '도전', value: `${s.attempts}번째 (계승 보너스 +${s.legacy})` }, { label: '감독 신뢰', value: `${s.trust} / 100` }, { label: '다음 상대', value: `가상 유스팀 (강함 ${44 + (s.season - 1) * 5 + s.game * 3})` }]} />
+            <div className="rs-tiles">
+                <div className="rs-tile"><b>{s.trust}</b><small>감독 신뢰 / 100</small></div>
+                <div className="rs-tile"><b>{44 + (s.season - 1) * 5 + s.game * 3}</b><small>다음 상대 강함</small></div>
+                <div className="rs-tile"><b>{s.attempts}</b><small>{s.attempts}번째 도전 (계승 +{s.legacy})</small></div>
+            </div>
             <Bars s={s.stats} />
-            <p className="rs-hint">경기 전 훈련 하나를 고른다. 포지션에 맞는 능력은 +3, 나머지는 +2.</p>
-            <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name}</Btn>)}</div>
+            <p className="rs-hint">경기 전 훈련 하나를 고른다. 숫자는 오르는 양.</p>
+            <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} +{POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
         </Group>}
         {!playing && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
