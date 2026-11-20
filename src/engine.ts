@@ -213,6 +213,8 @@ function ai(m: Match, p: Player, dt: number): [number, number, number?] {
     const hasBall = teamHasBall(m, p.team);
     // 공을 쫓는 선수: 팀에서 공에 가까운 2명
     let rank = 0; const dd = dist(p, b); for (const q of m.players) if (q.team === p.team && q.role !== 'GK' && q !== p && dist(q, b) < dd) rank++;
+    // 수비: 공을 가진 상대에 가까우면 슬라이딩 태클을 시도한다 (사람 조작 선수만 쓰던 태클을 AI도 쓰게 한다)
+    if (!hasBall && b.owner && b.owner.team !== p.team && rank < 2 && !p.human && p.lungeCd <= 0 && p.stun <= 0 && !p.kick && dist(p, b.owner) < 1.9 && Math.random() < dt * (1.2 + p.st.defense * 0.02)) { p.lunge = 0.3; p.lungeCd = 1.6 }
     if (!hasBall && rank < 2 && !p.human) return toward(b.x + b.vx * 0.25, b.z + b.vz * 0.25, 1);
     if (!b.owner && rank < 1) return toward(b.x + b.vx * 0.3, b.z + b.vz * 0.3, 1);
     const shift = hasBall ? 0.18 + clamp((depth - 0.4) * 0.3, 0, 0.12) : clamp((depth - 0.5) * 0.4, -0.12, 0.1) - 0.04;
