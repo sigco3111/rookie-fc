@@ -13,7 +13,7 @@ const POS: { id: Pos; name: string; base: Stats; key: (keyof Stats)[] }[] = [
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean }[]; lastMsg: string }
-interface Save { v: 1; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null }
+interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, proRes: null, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -64,7 +64,7 @@ export function App() {
     const startMatch = () => { setKey(k => k + 1); setPlaying({ oppStr: 44 + (s.season - 1) * 5 + s.game * 3 + s.attempts * 0, team: false, kind: 'youth' }); };
     const train = (k: keyof Stats) => {
         const posd = POS.find(p => p.id === s.pos)!; const gain = posd.key.includes(k) ? 3 : 2;
-        set({ stats: { ...s.stats, [k]: clamp(s.stats[k] + gain, 0, 99) }, trained: true });
+        set({ stats: { ...s.stats, [k]: clamp(s.stats[k] + gain, 0, 99) }, trained: true, tr: `${SK.find(x => x.key === k)!.name} +${gain}` });
     };
     const finish = (r: Result) => {
         setPlaying(null);
@@ -117,6 +117,7 @@ export function App() {
                 <div className="rs-tile"><b>{s.attempts}</b><small>{s.attempts}번째 도전 (계승 +{s.legacy})</small></div>
             </div>
             <Bars s={s.stats} />
+            {s.trained && s.tr && <div className="rs-grow"><strong>이번 훈련 성장</strong><span className="rs-chip">{s.tr}</span></div>}
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 숫자는 오르는 양.</p>
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} +{POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
@@ -131,7 +132,13 @@ export function App() {
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
         {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
-            <Facts items={[{ label: '능력치', value: `${s.evalRes.ability} / 40` }, { label: '경기 활약', value: `${s.evalRes.perf} / 35` }, { label: '감독 신뢰', value: `${s.evalRes.trust} / 25` }, { label: '합계', value: `${s.evalRes.total} / 100, 기준 ${s.evalRes.need}점 (${s.evalRes.early ? '조기 승격' : '기본 승격'})` }, ...(s.evalRes.ok ? [] : [{ label: '가장 부족한 항목', value: s.evalRes.missing }])]} />
+            <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={96} /></div>
+            <div className="rs-score"><span>{s.evalRes.total}</span><i>/ 100</i></div>
+            <p className="rs-hint rs-mid">기준 {s.evalRes.need}점 ({s.evalRes.early ? '조기 승격' : '기본 승격'}) {s.evalRes.ok ? '통과' : '미달'}</p>
+            <div className="rs-bars">
+                {([['능력치', s.evalRes.ability, 40], ['경기 활약', s.evalRes.perf, 35], ['감독 신뢰', s.evalRes.trust, 25]] as [string, number, number][]).map(([k, v, mx]) => <div key={k} className="rs-bar rs-bar-w"><span>{k}</span><div><i style={{ width: `${Math.min(100, v / mx * 100)}%` }} /></div><b>{v}/{mx}</b></div>)}
+            </div>
+            {!s.evalRes.ok && <div className="rs-grow"><strong>가장 부족한 항목</strong><span className="rs-chip">{s.evalRes.missing}</span></div>}
             <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 +3)' : '다음 시즌'}</Btn>
         </Group>}
         {!playing && s.phase === 'pro' && <Group label="1군 승격" heading>
