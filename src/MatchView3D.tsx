@@ -84,7 +84,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const b = m.ball; ball.position.set(b.x, 0.22 + b.y, b.z); bs.position.x = b.x; bs.position.z = b.z; ball.rotation.x += b.vz * dt * 3; ball.rotation.z -= b.vx * dt * 3;
                     // 카메라: 공과 내 선수 사이를 따라간다
                     const fx = (b.x + hu.x) / 2, fz = (b.z * 0.6 + hu.z * 0.4); cx += (fx - cx) * Math.min(1, dt * 3); cz += (fz - cz) * Math.min(1, dt * 3);
-                    const ccx = W / 2 + (cx - W / 2) * 0.8; cam.position.set(ccx, 17, Math.min(cz + 14, L + 19)); cam.lookAt(ccx, 0, Math.min(cz + 14, L + 19) - 17);
+                    const ccx = W / 2 + (cx - W / 2) * 0.8; cam.position.set(ccx, 17, Math.min(cz + 14, L + 19)); cam.lookAt(ccx, 0, Math.min(cz + 14, L + 19) - 23);
                     renderer.render(scene, cam);
                     drawHud(g, m, stick.current, I);
                     if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec }, rating: rating(m) }); return; } }
