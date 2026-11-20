@@ -138,7 +138,7 @@ export function App() {
             <div className="rs-bars">
                 {([['능력치', s.evalRes.ability, 40], ['경기 활약', s.evalRes.perf, 35], ['감독 신뢰', s.evalRes.trust, 25]] as [string, number, number][]).map(([k, v, mx]) => <div key={k} className="rs-bar rs-bar-w"><span>{k}</span><div><i style={{ width: `${Math.min(100, v / mx * 100)}%` }} /></div><b>{v}/{mx}</b></div>)}
             </div>
-            {!s.evalRes.ok && <div className="rs-grow"><strong>가장 부족한 항목</strong><span className="rs-chip">{s.evalRes.missing}</span></div>}
+            {!s.evalRes.ok && <div className="rs-grow"><strong>가장 부족한 항목</strong><span className="rs-chip">{s.evalRes.missing}</span><small className="rs-hint">{s.evalRes.missing === '능력치' ? '훈련으로 능력치를 올린다.' : s.evalRes.missing === '경기 활약' ? '평균 평점이 오르면 상승 (8.0이면 만점).' : '평점 6.5 초과면 신뢰 상승, 미만이면 하락.'}</small></div>}
             <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 +3)' : '다음 시즌'}</Btn>
         </Group>}
         {!playing && s.phase === 'pro' && <Group label="1군 승격" heading>
