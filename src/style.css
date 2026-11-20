@@ -56,3 +56,4 @@ html, body { background: radial-gradient(1200px 600px at 50% -10%, #1d3a63 0%, #
 .ui-closing { font-size: 12px; }
 button, input { font-family: RSKR, system-ui, sans-serif; }
 .rs-input { width: 100%; max-width: 100%; }
+html { background-color: #0f1b2d; }
