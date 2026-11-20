@@ -7,7 +7,7 @@ import * as SU from 'three/examples/jsm/utils/SkeletonUtils.js';
 import * as fflate from 'fflate';
 import zipUrl from './models/mini.zip?url';
 
-export const LOOKS = ['male-a', 'male-c', 'male-e', 'female-a', 'female-c', 'female-e'];
+export const LOOKS = ['male-a', 'male-c', 'male-e', 'female-b', 'female-c', 'female-e'];
 let cache: Promise<any> | null = null;
 function load() {
     if (!cache) cache = (async () => {
