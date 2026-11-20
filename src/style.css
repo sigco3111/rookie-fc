@@ -1,3 +1,4 @@
+@font-face { font-family: RSKR; src: url('./models/hud.woff') format('woff'); font-display: swap; }
 html, body, #root { margin: 0; min-height: 100%; }
 body { background: var(--ds-page); }
 
@@ -21,7 +22,7 @@ body { background: var(--ds-page); }
 .rs-center { display: flex; justify-content: center; margin: 8px 0; }
 .rs-portrait { display: block; }
 :root { --ds-page: #fdfbf9; --ds-ink: #3b2a28; --ds-ink-2: #7a6a67; --ds-hairline: #e6dedb; }
-body { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: var(--ds-ink); line-height: 1.55; }
+body { font-family: RSKR, system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: var(--ds-ink); line-height: 1.55; }
 .ui-card { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
 .ui-title { font-size: 28px; margin: 8px 0; font-weight: 500; }
 .ui-fact, .ui-intro { color: var(--ds-ink-2); margin: 6px 0; }
@@ -53,3 +54,4 @@ html, body { background: radial-gradient(1200px 600px at 50% -10%, #1d3a63 0%, #
 .rs-me td { background: rgba(255, 216, 74, .16); }
 .rs-info { margin: 18px 0; color: var(--ds-ink-2); font-size: 13px; } .rs-info summary { cursor: pointer; padding: 8px 0; }
 .ui-closing { font-size: 12px; }
+button, input { font-family: RSKR, system-ui, sans-serif; }

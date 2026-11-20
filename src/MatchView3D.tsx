@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { W, L, GOAL_HALF, makeMatch, step, rating, type Match, type Stats, type Pos, type Rec, type Input } from './engine';
+import hudUrl from './models/hud.woff?url';
 import { loadAssets, Rig, T } from './rig';
 
 const CW = 390, CH = 590;
@@ -40,6 +41,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }
             try {
                 renderer = new T.WebGLRenderer({ canvas: gl.current!, antialias: true });
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(CW, CH, false);
+                try { const ff = new FontFace('RSHud', `url(${hudUrl})`); await ff.load(); document.fonts.add(ff); } catch {}
                 const A = await loadAssets(); if (!alive) return;
                 const scene = new T.Scene(); scene.background = new T.Color(0x86b9e0); scene.fog = new T.Fog(0x86b9e0, 55, 110);
                 scene.add(new T.HemisphereLight(0xffffff, 0x4a6a4a, 1.9)); const dl = new T.DirectionalLight(0xffffff, 1.6); dl.position.set(10, 30, 20); scene.add(dl);
@@ -115,11 +117,11 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }
 function drawHud(g: CanvasRenderingContext2D, m: Match, st: { ox: number; oy: number } | null, I: { mx: number; mz: number }) {
     g.clearRect(0, 0, CW, CH);
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, CW, 24);
-    g.fillStyle = '#fff'; g.font = '700 15px sans-serif'; g.textAlign = 'center';
+    g.fillStyle = '#fff'; g.font = '700 15px RSHud, sans-serif'; g.textAlign = 'center';
     const tt = Math.min(m.t - (m.half - 1) * m.halfLen, m.halfLen); const mm = Math.floor(tt / 60), ss = Math.floor(tt % 60);
     g.fillText(`내 팀 ${m.score[0]} : ${m.score[1]} 상대    ${m.half === 1 ? '전반' : '후반'} ${mm}:${String(ss).padStart(2, '0')}`, CW / 2, 17);
     if (m.charge > 0) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(CW / 2 - 40, CH - 28, 80, 10); g.fillStyle = m.charge > 0.8 ? '#ff6b3d' : '#ffd23d'; g.fillRect(CW / 2 - 39, CH - 27, 78 * m.charge, 8); }
-    if (m.banner && m.state !== 'play') { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, CH / 2 - 34, CW, 58); g.fillStyle = '#fff'; g.font = '800 34px sans-serif'; g.fillText(m.banner, CW / 2, CH / 2 + 8); }
+    if (m.banner && m.state !== 'play') { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, CH / 2 - 34, CW, 58); g.fillStyle = '#fff'; g.font = '800 34px RSHud, sans-serif'; g.fillText(m.banner, CW / 2, CH / 2 + 8); }
     if (st) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 3; g.beginPath(); g.arc(st.ox, st.oy, 38, 0, Math.PI * 2); g.stroke(); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(st.ox + I.mx * 38, st.oy + I.mz * 38, 16, 0, Math.PI * 2); g.fill(); }
     g.textAlign = 'left';
 }
