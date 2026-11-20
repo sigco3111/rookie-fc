@@ -17,7 +17,7 @@ function pitchTexture() {
     const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 
-export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }: { stats: Stats; pos: Pos; oppStr: number; teamControl: boolean; halfLen: number; onFinish: (r: Result) => void }) {
+export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, onQuit }: { stats: Stats; pos: Pos; oppStr: number; teamControl: boolean; halfLen: number; onFinish: (r: Result) => void; onQuit?: () => void }) {
     const gl = useRef<HTMLCanvasElement>(null);
     const hud = useRef<HTMLCanvasElement>(null);
     const inp = useRef({ mx: 0, mz: 0, passPressed: false, shootDown: false, shootReleased: false, switchPressed: false, keys: {} as Record<string, boolean> });
@@ -25,6 +25,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }
     const finished = useRef(false);
     const passBtn = useRef<HTMLButtonElement>(null);
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
+    const paused = useRef(false); const [ps, setPs] = useState(false);
+    const setPause = (v: boolean) => { paused.current = v; setPs(v); if (v) { const I = inp.current; I.mx = 0; I.mz = 0; I.shootDown = false; for (const k in I.keys) I.keys[k] = false; } };
+    useEffect(() => { const h = () => { if (document.hidden) setPause(true); }; document.addEventListener('visibilitychange', h); return () => document.removeEventListener('visibilitychange', h); }, []);
 
     useEffect(() => {
         let raf = 0, alive = true; let renderer: any = null;
@@ -72,7 +75,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
-                    step(m, dt, inputObj); I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (!paused.current) step(m, dt, inputObj); I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
                     const hu = m.players[m.humanId]; const want = m.ball.owner === hu ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
                     m.players.forEach((p, i) => {
                         const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); shadows[i].position.x = p.x; shadows[i].position.z = p.z;
@@ -103,6 +106,12 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish }
     return <div className="rs-wrap" style={{ position: 'relative', width: '100%', maxWidth: 420, margin: '0 auto', aspectRatio: `${CW} / ${CH}`, touchAction: 'none', userSelect: 'none', background: '#2a6a33', borderRadius: 12 }}>
         <canvas ref={gl} width={CW} height={CH} style={fill} />
         <canvas ref={hud} width={CW} height={CH} style={fill} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+        {!ps && !msg && <button type="button" aria-label="일시정지" onClick={() => setPause(true)} style={{ position: 'absolute', right: '2%', top: '9%', padding: '4px 10px', borderRadius: 14, border: '1px solid rgba(255,255,255,.7)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: 13 }}>일시정지</button>}
+        {ps && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 5, borderRadius: 12, background: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 22 }}>일시정지</div>
+            <button type="button" onClick={() => setPause(false)} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16 }}>계속하기</button>
+            {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '8px 20px', borderRadius: 22, border: '1px solid rgba(255,255,255,.7)', background: 'transparent', color: '#fff', fontSize: 14 }}>경기 나가기</button>}
+        </div>}
         {msg && <div style={{ position: 'absolute', left: 0, right: 0, top: '45%', textAlign: 'center', color: '#fff', fontWeight: 700, padding: 12 }}>{msg}</div>}
         <button type="button" ref={passBtn} aria-label="패스 또는 태클" style={btn({ right: '22%', bottom: '4%', width: '17%', aspectRatio: '1', background: 'rgba(40,110,200,.75)' })}
             onPointerDown={e => { e.preventDefault(); inp.current.passPressed = true; }}>패스</button>

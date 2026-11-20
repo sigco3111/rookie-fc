@@ -98,7 +98,7 @@ export function App() {
         <Header title="루키나인 축구" fact="유스에서 키워 1군으로. 7대7" />
         <Callout>{saved.message || '진행은 이 기기와 이 브라우저에 저장된다.'}</Callout>
         {playing && <Group label={playing.kind === 'pro' ? '1군 경기: 팀 전체 조작' : `유스 ${s.season}시즌 ${s.game + 1}경기`} heading>
-            <MatchView key={key} stats={s.stats} pos={s.pos} oppStr={playing.oppStr} teamControl={playing.team} halfLen={HALF} onFinish={finish} />
+            <MatchView key={key} stats={s.stats} pos={s.pos} oppStr={playing.oppStr} teamControl={playing.team} halfLen={HALF} onFinish={finish} onQuit={() => setPlaying(null)} />
             <p className="rs-hint">왼쪽 화면을 누른 채 끌어서 이동. 슛은 누르고 있으면 힘이 찬다. 공이 없을 때 패스 버튼은 태클이다{playing.team ? '. 전환은 가까운 선수로 바꾼다' : ''}. 키보드는 방향키, 스페이스 패스, K 슛.</p>
         </Group>}
         {!playing && s.phase === 'new' && <Group label="선수 만들기" heading>
