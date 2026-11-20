@@ -92,7 +92,7 @@ export function App() {
     const startLeague = () => { const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ league: newLeague(myStr), phase: 'league' }); };
     const playRound = () => { const lg = s.league!; const o = lg.teams[myFixture(lg)]; setKey(k => k + 1); setPlaying({ oppStr: o.str, team: true, kind: 'pro' }); };
     const autoRound = () => { const lg = s.league!; const me = lg.teams[0], o = lg.teams[myFixture(lg)]; const gm = poisson(1.3 * Math.pow(me.str / o.str, 1.3)), go = poisson(1.3 * Math.pow(o.str / me.str, 1.3)); const nl = applyRound(lg, [gm, go]); set({ league: nl, phase: nl.round >= 14 ? 'leagueEnd' : 'league' }); };
-    const reset = () => { if (saved.ready) setSave(initial); };
+    const reset = () => { if (!saved.ready) return; if (!window.confirm('저장된 진행을 모두 지우고 처음부터 시작할까?')) return; setSave(initial); };
 
     return <FileCard>
         <Header title="루키나인 축구" fact="유스에서 키워 1군으로. 7대7" />
