@@ -166,7 +166,7 @@ export function App() {
                 </div></>; })()}
             <p className="rs-hint">이 버전은 여기까지. 다음 시즌은 아직 없다.</p>
             <Table lg={s.league} />
-            <Btn onClick={startLeague}>같은 선수로 리그 다시 도전</Btn>
+            <Btn onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
         </Group>}
         {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
