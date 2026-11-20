@@ -117,7 +117,7 @@ export function App() {
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
         </Group>}
-        {!playing && s.phase === 'result' && s.last && <Group label="경기 결과" heading>
+        {!playing && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
             <Facts items={[{ label: '점수', value: `${s.last.score[0]} : ${s.last.score[1]}` }, { label: '내 평점', value: s.last.rating.toFixed(1) }, { label: '활약', value: `골 ${s.last.goals}, 도움 ${s.last.assists}, 슛 ${s.last.shots}, 패스 ${s.last.passOk}/${s.last.passAtt}, 태클 ${s.last.tackles}` }, { label: '감독 신뢰', value: `${s.last.trustD >= 0 ? '+' : ''}${s.last.trustD}` }, { label: '성장', value: `${s.last.grew} +1` }]} />
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
