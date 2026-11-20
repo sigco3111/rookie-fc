@@ -13,7 +13,7 @@ const POS: { id: Pos; name: string; base: Stats; key: (keyof Stats)[] }[] = [
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean }[]; lastMsg: string }
-interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null }
+interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, proRes: null, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -71,8 +71,8 @@ export function App() {
         if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league' }); return; }
         const trustD = Math.round((r.rating - 6.5) * 6 + 2); const stats = { ...s.stats }; let grew = '';
         const bump = (k: keyof Stats) => { stats[k] = clamp(stats[k] + 1, 0, 99); grew = grew ? grew + ', ' + SK.find(x => x.key === k)!.name : SK.find(x => x.key === k)!.name; };
-        if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); if (!grew) bump(POS.find(p => p.id === s.pos)!.key[0]);
-        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew } });
+        if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); let gb = false; if (!grew) { bump(POS.find(p => p.id === s.pos)!.key[0]); gb = true; }
+        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
     };
     const afterResult = () => {
         if (s.game + 1 >= MATCHES_PER_SEASON) {
@@ -128,7 +128,7 @@ export function App() {
             <div className="rs-tiles">
                 {([['평점', s.last.rating.toFixed(1)], ['골', String(s.last.goals)], ['도움', String(s.last.assists)], ['슛', String(s.last.shots)], ['패스', `${s.last.passOk}/${s.last.passAtt}`], ['태클', String(s.last.tackles)]] as [string, string][]).map(([k, v]) => <div key={k} className="rs-tile"><b>{v}</b><small>{k}</small></div>)}
             </div>
-            <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
+            <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{s.last!.gb ? '기본 성장 ' : ''}{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
         {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
