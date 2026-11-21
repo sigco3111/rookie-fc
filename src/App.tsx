@@ -39,6 +39,9 @@ function applyRound(lg: League, myScore: [number, number] | null, rec?: { rating
 }
 const myFixture = (lg: League) => { const p = lg.fixtures[lg.round].find(x => x[0] === 0 || x[1] === 0)!; return p[0] === 0 ? p[1] : p[0]; };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+// 1군 시즌 사이 성장: 순위가 높을수록 주 능력치가 더 오른다. 나머지 능력치는 +1.
+const proGain = (rk: number) => rk <= 2 ? 3 : rk <= 5 ? 2 : 1;
+const proGrow = (st: Stats, pos: Pos, rk: number): Stats => { const key = (POS.find(p => p.id === pos) || POS[0]).key; const g = proGain(rk); const o = { ...st }; (Object.keys(o) as (keyof Stats)[]).forEach(k => { o[k] = clamp(o[k] + (key.includes(k) ? g : 1), 0, 99); }); return o; };
 const avgKey = avgKeyOf;
 
 function Btn({ children, onClick, kind = 'primary', disabled }: { children: React.ReactNode; onClick: () => void; kind?: 'primary' | 'secondary'; disabled?: boolean }) {
@@ -86,7 +89,7 @@ export function App() {
         if (s.season >= SEASONS) { const b: Stats = { ...s.stats }; const L2 = s.legacy + 3; (Object.keys(b) as (keyof Stats)[]).forEach(k => { b[k] = clamp(b[k] + 3, 0, 99); }); set({ phase: 'home', season: 1, game: 0, trust: 40, ratings: [], stats: b, trained: false, attempts: s.attempts + 1, legacy: L2, evalRes: null }); }
         else set({ phase: 'home', season: s.season + 1, game: 0, ratings: [], trained: false, evalRes: null });
     };
-    const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
+    const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const ns = proGrow(s.stats, s.pos, rk); const myStr = Math.round(60 + (avgKey(ns, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], stats: ns, proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
     const startLeague = () => { const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ league: newLeague(myStr), phase: 'league' }); };
     const playRound = () => { const lg = s.league!; const o = lg.teams[myFixture(lg)]; setKey(k => k + 1); setPlaying({ oppStr: o.str, team: true, kind: 'pro' }); };
     const autoRound = () => { const lg = s.league!; const me = lg.teams[0], o = lg.teams[myFixture(lg)]; const gm = poisson(1.3 * Math.pow(me.str / o.str, 1.3)), go = poisson(1.3 * Math.pow(o.str / me.str, 1.3)); const nl = applyRound(lg, [gm, go]); set({ league: nl, phase: nl.round >= 14 ? 'leagueEnd' : 'league' }); };
@@ -163,9 +166,9 @@ export function App() {
                     <div className="rs-tile"><b>{s.league.log.reduce((a, c) => a + c.goals, 0)} / {s.league.log.reduce((a, c) => a + c.assists, 0)}</b><small>골 / 도움</small></div>
                 </div></>; })()}
             {(s.hist ?? []).length > 0 && <p className="rs-hint">지난 시즌: {(s.hist ?? []).map(h => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`).join(', ')}</p>}
-            <p className="rs-hint">다음 시즌은 같은 능력치로 새 8팀 리그를 치른다. 이번 시즌 순위는 기록으로 남는다. 시즌 사이 성장과 이적은 아직 없다.</p>
+            <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 주 능력치 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
             <Table lg={s.league} />
-            <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (능력치 유지)`}</Btn>
+            <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn>
             <Btn kind="secondary" onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
         </Group>}
