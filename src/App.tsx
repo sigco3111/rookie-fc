@@ -130,6 +130,7 @@ export function App() {
                 {([['평점', s.last.rating.toFixed(1)], ['골', String(s.last.goals)], ['도움', String(s.last.assists)], ['슛', String(s.last.shots)], ['패스', `${s.last.passOk}/${s.last.passAtt}`], ['태클', String(s.last.tackles)]] as [string, string][]).map(([k, v]) => <div key={k} className="rs-tile"><b>{v}</b><small>{k}</small></div>)}
             </div>
             <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{s.last!.gb ? '기본 성장 ' : ''}{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
+            <p className="rs-hint">평점 6.2가 신뢰가 오르고 내리는 기준선이다.</p>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
         {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
