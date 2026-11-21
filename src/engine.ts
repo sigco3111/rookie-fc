@@ -61,8 +61,12 @@ function giveBall(m: Match, p: Player) {
     if (m.teamControl && p.team === 0 && !p.human) { switchTo(m, p) }
 }
 function switchTo(m: Match, p: Player) { const o = m.players[m.humanId]; if (o === p || p.role === 'GK') return; o.human = false; p.human = true; m.humanId = p.id; }
-function shoot(m: Match, p: Player, power: number) {
-    const gz = p.team === 0 ? 0 : L; const gx = W / 2 + (Math.random() - 0.5) * GOAL_HALF * 1.2;
+// 슛 방향 규칙: 이동 스틱의 좌우 성분(|mx| > 0.25)이 있으면 그 쪽 골대 구석(중앙에서 최대 GOAL_HALF*0.8)을 노린다.
+// 스틱을 안 쓰거나 거의 중앙이면 이전처럼 골대 중앙 근처 무작위. 골대 반대(뒤쪽) 입력은 방향에 쓰이지 않는다.
+export const TUNE = { aim: true, aimDead: 0.25, aimReach: 0.8, gkReach: 1.4, gkTrack: 0.2, gkReachOwn: 1.9, gkTrackOwn: 0.35 } // gk*는 상대(team 1) 키퍼, gk*Own은 내 팀 키퍼(예전 값 유지);
+function shoot(m: Match, p: Player, power: number, aim?: number) {
+    const gz = p.team === 0 ? 0 : L; const useAim = TUNE.aim && aim !== undefined && Math.abs(aim) > TUNE.aimDead;
+    const gx = useAim ? W / 2 + Math.sign(aim!) * Math.min(1, Math.abs(aim!)) * GOAL_HALF * TUNE.aimReach : W / 2 + (Math.random() - 0.5) * GOAL_HALF * 1.2;
     let dx = gx - p.x, dz = gz - p.z; const n = Math.hypot(dx, dz); dx /= n; dz /= n;
     const err = (1 - p.st.shoot / 100) * 0.55 * (0.6 + power * 0.7) * (Math.random() * 2 - 1);
     const c = Math.cos(err), s = Math.sin(err); const rx = dx * c - dz * s, rz = dx * s + dz * c;
@@ -119,7 +123,7 @@ function update(m: Match, dt: number, inp: Input) {
     }
     const H = m.players[m.humanId];
     if (inp.shootDown && b.owner === H && !H.kick) m.charge = Math.min(1, m.charge + dt * 1.1); else if (!inp.shootDown && !inp.shootReleased) m.charge = 0;
-    if (inp.shootReleased && b.owner === H && !H.kick && m.state !== 'goal') { shoot(m, H, Math.max(0.35, m.charge)); m.charge = 0 }
+    if (inp.shootReleased && b.owner === H && !H.kick && m.state !== 'goal') { shoot(m, H, Math.max(0.35, m.charge), inp.mz > 0.3 && H.team === 0 ? 0 : inp.mx); m.charge = 0 }
     if (inp.passPressed && !H.kick) {
         if (b.owner === H) {
             const useDir = Math.hypot(inp.mx, inp.mz) > 0.3; const t = bestPassTarget(m, H, inp.mx, inp.mz, useDir);
@@ -159,7 +163,7 @@ function update(m: Match, dt: number, inp: Input) {
         // 줍기
         let best: Player | null = null, bd = 1e9;
         for (const p of m.players) {
-            if (p.noPick > 0 || p.stun > 0) continue; const d = dist(p, b); const reach = p.role === 'GK' ? 1.9 : 1.0; const maxY = p.role === 'GK' ? 2.4 : 1.0;
+            if (p.noPick > 0 || p.stun > 0) continue; const d = dist(p, b); const reach = p.role === 'GK' ? (p.team === 1 ? TUNE.gkReach : TUNE.gkReachOwn) : 1.0; const maxY = p.role === 'GK' ? 2.4 : 1.0;
             if (d < reach && b.y < maxY && d < bd) { bd = d; best = p }
         }
         if (best) {
@@ -194,7 +198,7 @@ function ai(m: Match, p: Player, dt: number): [number, number, number?] {
         const gl = ownGoalZ(p.team); const bd = dist(p, b);
         if (!b.owner && bd < 9 && Math.abs(b.z - gl) < 14 && (b.vz * f < 0 ? false : Math.hypot(b.vx, b.vz) < 14)) return toward(b.x, b.z, 1);
         if (b.owner === p) { p.think -= dt; if (p.think <= 0 && !p.kick) { p.think = 0.9; const t = bestPassTarget(m, p, 0, 0, false); passTo(m, p, t, 0, f) } return [0, 0, 0] }
-        const gx = clamp(W / 2 + (b.x - W / 2) * 0.35, W / 2 - 3, W / 2 + 3); return toward(gx, gl + f * (b.vz * -f > 6 ? 1.4 : 1.8), 0.9);
+        const gx = clamp(W / 2 + (b.x - W / 2) * (p.team === 1 ? TUNE.gkTrack : TUNE.gkTrackOwn), W / 2 - 3, W / 2 + 3); return toward(gx, gl + f * (b.vz * -f > 6 ? 1.4 : 1.8), 0.9);
     }
     if (b.owner === p) {
         p.think -= dt; let near: Player | null = null, nd = 1e9; for (const o of m.players) if (o.team !== p.team) { const d = dist(o, p); if (d < nd) { nd = d; near = o } }
