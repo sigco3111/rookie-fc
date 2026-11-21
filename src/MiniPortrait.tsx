@@ -39,6 +39,7 @@ function headTex(m: any, base: HTMLCanvasElement) { // 머리 메쉬가 쓰는 �
     m.traverse((o: any) => { if (o.isMesh && o.name === 'head-mesh') { const uv = o.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) { const k = (Math.min(W - 1, Math.max(0, Math.floor(uv.getX(i) * W))) + Math.min(H - 1, Math.max(0, Math.floor(uv.getY(i) * H))) * W) * 4; set.add(key([px[k] / 255, px[k + 1] / 255, px[k + 2] / 255])); } } });
     return set;
 }
+const SHORTS = new T.MeshStandardMaterial({ color: 0x1f2f55, roughness: 0.9 });
 const HAIR = new T.MeshStandardMaterial({ color: 0x8a4a2a, roughness: 0.9 });
 function capToHair(o: any, base: HTMLCanvasElement) {
     const g = o.geometry; const uv = g.attributes.uv; const idx = g.index; if (!uv || !idx) return;
@@ -61,11 +62,11 @@ function kitGroups(o: any, base: HTMLCanvasElement, headSet: Set<string>) {
     const col = (a: number, b: number, c: number) => { const u = (uv.getX(a) + uv.getX(b) + uv.getX(c)) / 3, v = (uv.getY(a) + uv.getY(b) + uv.getY(c)) / 3; const k = (Math.min(W - 1, Math.max(0, Math.floor(u * W))) + Math.min(H - 1, Math.max(0, Math.floor(v * H))) * W) * 4; return [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255]; };
     const tris: any[] = [];
     for (let i = 0; i < idx.count; i += 3) { const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2); const y = ((p.getY(a) + p.getY(b) + p.getY(c)) / 3 - y0) / hh; const cl = col(a, b, c); tris.push({ a, b, c, y, cl }); }
-    const A: number[] = [], B: number[] = [];
+    const A: number[] = [], B: number[] = [], C: number[] = [];
     for (const t of tris) { const [r, gg, bl] = t.cl; const mx = Math.max(r, gg, bl), mn = Math.min(r, gg, bl); const sat = mx ? (mx - mn) / mx : 0; const df = mx - mn; let hu = df ? (mx === r ? ((gg - bl) / df + 6) % 6 : mx === gg ? (bl - r) / df + 2 : (r - gg) / df + 4) * 60 : 0; const isSkin = headSet.has(key(t.cl)) && hu >= 5 && hu <= 50;
-        const shirt = t.y > 0.4 && !isSkin && (sat > 0.25 || mx > 0.8) && mx > 0.25; (shirt ? B : A).push(t.a, t.b, t.c); }
+        const shirt = t.y > 0.4 && !isSkin && (sat > 0.25 || mx > 0.8) && mx > 0.25; const pants = !shirt && !isSkin && t.y > 0.14 && t.y <= 0.4; (shirt ? B : pants ? C : A).push(t.a, t.b, t.c); }
     if (!B.length) return;
-    const ng = g.clone(); ng.setIndex([...A, ...B]); ng.clearGroups(); ng.addGroup(0, A.length, 0); ng.addGroup(A.length, B.length, 1); o.geometry = ng; o.material = [o.material, RED];
+    const ng = g.clone(); ng.setIndex([...A, ...B, ...C]); ng.clearGroups(); ng.addGroup(0, A.length, 0); ng.addGroup(A.length, B.length, 1); if (C.length) ng.addGroup(A.length + B.length, C.length, 2); o.geometry = ng; o.material = [o.material, RED, SHORTS];
 }
 export function MiniPortrait({ look, size = 160 }: { look: number; size?: number }) {
     const ref = useRef<HTMLCanvasElement>(null); const [err, setErr] = useState('');
