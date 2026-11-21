@@ -1,3 +1,4 @@
+import { POS, avgKeyOf, abilityScore, perfScore, trustScore, trustDelta, needFor } from './growth';
 import { MiniPortrait, LOOKS } from './MiniPortrait';
 import React, { useState } from 'react';
 import { Callout, Closing, Facts, FileCard, Group, Header, useLocalState } from './ui';
@@ -5,11 +6,7 @@ import { MatchView, type Result } from './MatchView3D';
 import type { Pos, Stats } from './engine';
 
 const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' }, { key: 'pass', name: '패스' }, { key: 'dribble', name: '드리블' }, { key: 'defense', name: '수비' }, { key: 'speed', name: '속도' }];
-const POS: { id: Pos; name: string; base: Stats; key: (keyof Stats)[] }[] = [
-    { id: 'FW', name: '공격수', base: { shoot: 58, pass: 50, dribble: 54, defense: 42, speed: 52 }, key: ['shoot', 'dribble', 'speed'] },
-    { id: 'MF', name: '미드필더', base: { shoot: 48, pass: 58, dribble: 54, defense: 50, speed: 50 }, key: ['pass', 'dribble', 'defense'] },
-    { id: 'DF', name: '수비수', base: { shoot: 40, pass: 50, dribble: 46, defense: 60, speed: 52 }, key: ['defense', 'speed', 'pass'] },
-];
+
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean }[]; lastMsg: string }
@@ -42,7 +39,7 @@ function applyRound(lg: League, myScore: [number, number] | null, rec?: { rating
 }
 const myFixture = (lg: League) => { const p = lg.fixtures[lg.round].find(x => x[0] === 0 || x[1] === 0)!; return p[0] === 0 ? p[1] : p[0]; };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-const avgKey = (s: Stats, pos: Pos) => { const k = POS.find(p => p.id === pos)!.key; return k.reduce((a, c) => a + s[c], 0) / k.length; };
+const avgKey = avgKeyOf;
 
 function Btn({ children, onClick, kind = 'primary', disabled }: { children: React.ReactNode; onClick: () => void; kind?: 'primary' | 'secondary'; disabled?: boolean }) {
     return <button type="button" className="file-button is-compact" data-variant={kind} disabled={disabled} onClick={onClick} style={{ minHeight: 44 }}>{children}</button>;
@@ -69,16 +66,16 @@ export function App() {
     const finish = (r: Result) => {
         setPlaying(null);
         if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league' }); return; }
-        const trustD = Math.round((r.rating - 6.5) * 6 + 2); const stats = { ...s.stats }; let grew = '';
+        const trustD = trustDelta(r.rating); const stats = { ...s.stats }; let grew = '';
         const bump = (k: keyof Stats) => { stats[k] = clamp(stats[k] + 1, 0, 99); grew = grew ? grew + ', ' + SK.find(x => x.key === k)!.name : SK.find(x => x.key === k)!.name; };
         if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); let gb = false; if (!grew) { bump(POS.find(p => p.id === s.pos)!.key[0]); gb = true; }
         set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
     };
     const afterResult = () => {
         if (s.game + 1 >= MATCHES_PER_SEASON) {
-            const ability = Math.round(clamp((avgKey(s.stats, s.pos) - 45) / 25, 0, 1) * 40);
-            const avgR = s.ratings.reduce((a, c) => a + c, 0) / Math.max(1, s.ratings.length); const perf = Math.round(clamp((avgR - 5) / 3, 0, 1) * 35);
-            const trust = Math.round(s.trust / 100 * 25); const total = ability + perf + trust; const final = s.season >= SEASONS; const need = final ? 65 : 80; const ok = total >= need;
+            const ability = abilityScore(s.stats, s.pos);
+            const perf = perfScore(s.ratings);
+            const trust = trustScore(s.trust); const total = ability + perf + trust; const final = s.season >= SEASONS; const need = needFor(s.season, SEASONS); const ok = total >= need;
             const miss: [string, number][] = [['능력치', 40 - ability], ['경기 활약', 35 - perf], ['감독 신뢰', 25 - trust]]; miss.sort((a, b) => b[1] - a[1]);
             set({ phase: 'eval', evalRes: { ability, perf, trust, total, need, early: !final, ok, missing: miss[0][0] } });
         } else set({ phase: 'home', game: s.game + 1, trained: false });
