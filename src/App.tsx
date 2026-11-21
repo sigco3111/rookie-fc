@@ -137,7 +137,7 @@ export function App() {
                 {([['능력치', s.evalRes.ability, 40], ['경기 활약', s.evalRes.perf, 35], ['감독 신뢰', s.evalRes.trust, 25]] as [string, number, number][]).map(([k, v, mx]) => <div key={k} className="rs-bar rs-bar-w"><span>{k}</span><div><i style={{ width: `${Math.min(100, v / mx * 100)}%` }} /></div><b>{v}/{mx}</b></div>)}
             </div>
             {!s.evalRes.ok && <div className="rs-grow"><strong>만점까지 가장 많이 남은 항목</strong><span className="rs-chip">{s.evalRes.missing}</span><small className="rs-hint">{s.evalRes.missing === '능력치' ? '훈련으로 능력치를 올린다.' : s.evalRes.missing === '경기 활약' ? '평균 평점이 오르면 상승 (8.0이면 만점).' : '평점 약 6.25 이상이면 신뢰 상승, 약 6.1 미만이면 하락 (사이는 그대로).'}</small></div>}
-            <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (능력치 유지, 계승 보상 +3)' : '다음 시즌'}</Btn>
+            <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 능력치 +3, 신뢰 40 시작)' : '다음 시즌'}</Btn>
         </Group>}
         {!playing && s.phase === 'pro' && <Group label="1군 승격" heading>
             <Callout>승격 후에는 팀 전체를 조작한다. 공을 가진 선수는 직접, 나머지는 AI. 전환 버튼으로 가까운 선수로 바꾼다. 가상 구단 8팀 풀리그(14라운드)이고 직접 뛰지 않는 라운드는 자동 진행한다.</Callout>
