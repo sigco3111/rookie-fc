@@ -109,6 +109,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         {!ps && !msg && <button type="button" aria-label="일시정지" onClick={() => setPause(true)} style={{ position: 'absolute', right: '2%', top: '9%', padding: '4px 10px', borderRadius: 14, border: '1px solid rgba(255,255,255,.7)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: 13 }}>일시정지</button>}
         {ps && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 5, borderRadius: 12, background: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
             <div style={{ fontWeight: 800, fontSize: 22 }}>일시정지</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, textAlign: 'center', wordBreak: 'keep-all', padding: '0 14px', opacity: 0.9 }}>왼쪽 화면을 누른 채 끌어서 이동. 패스 버튼은 패스와 태클, 슛 버튼은 오른쪽 아래. 슛은 누르고 있으면 힘이 찬다.</div>
             <button type="button" onClick={() => setPause(false)} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16 }}>계속하기</button>
             {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '8px 20px', borderRadius: 22, border: '1px solid rgba(255,255,255,.7)', background: 'transparent', color: '#fff', fontSize: 14 }}>경기 나가기</button>}
         </div>}
