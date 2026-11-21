@@ -13,7 +13,7 @@ const POS: { id: Pos; name: string; base: Stats; key: (keyof Stats)[] }[] = [
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean }[]; lastMsg: string }
-interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null }
+interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null; proSeason?: number; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, proRes: null, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -89,6 +89,7 @@ export function App() {
         if (s.season >= SEASONS) { const b: Stats = { ...s.stats }; const L2 = s.legacy + 3; (Object.keys(b) as (keyof Stats)[]).forEach(k => { b[k] = clamp(b[k] + 3, 0, 99); }); set({ phase: 'home', season: 1, game: 0, trust: 40, ratings: [], stats: b, trained: false, attempts: s.attempts + 1, legacy: L2, evalRes: null }); }
         else set({ phase: 'home', season: s.season + 1, game: 0, ratings: [], trained: false, evalRes: null });
     };
+    const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
     const startLeague = () => { const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ league: newLeague(myStr), phase: 'league' }); };
     const playRound = () => { const lg = s.league!; const o = lg.teams[myFixture(lg)]; setKey(k => k + 1); setPlaying({ oppStr: o.str, team: true, kind: 'pro' }); };
     const autoRound = () => { const lg = s.league!; const me = lg.teams[0], o = lg.teams[myFixture(lg)]; const gm = poisson(1.3 * Math.pow(me.str / o.str, 1.3)), go = poisson(1.3 * Math.pow(o.str / me.str, 1.3)); const nl = applyRound(lg, [gm, go]); set({ league: nl, phase: nl.round >= 14 ? 'leagueEnd' : 'league' }); };
@@ -145,7 +146,7 @@ export function App() {
             <Callout>승격 후에는 팀 전체를 조작한다. 공을 가진 선수는 직접, 나머지는 AI. 전환 버튼으로 가까운 선수로 바꾼다. 가상 구단 8팀 풀리그(14라운드)이고 직접 뛰지 않는 라운드는 자동 진행한다.</Callout>
             <Btn onClick={startLeague}>1군 리그 시작</Btn>
         </Group>}
-        {!playing && s.phase === 'league' && s.league && <Group label={`1군 리그 ${s.league.round + 1}/14라운드`} heading>
+        {!playing && s.phase === 'league' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 리그 ${s.league.round + 1}/14라운드`} heading>
             {s.league.lastMsg && <Callout>지난 경기: {s.league.lastMsg}</Callout>}
             <div className="rs-tiles rs-vs">
                 <div className="rs-tile"><b>{s.league.teams[0].str}</b><small>우리 구단 강함</small></div>
@@ -155,7 +156,7 @@ export function App() {
             <div className="rs-row"><Btn onClick={playRound}>직접 뛰기</Btn><Btn kind="secondary" onClick={autoRound}>자동 진행</Btn></div>
             <Table lg={s.league} />
         </Group>}
-        {!playing && s.phase === 'leagueEnd' && s.league && <Group label="1군 첫 시즌 종료" heading>
+        {!playing && s.phase === 'leagueEnd' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 종료`} heading>
             {(() => { const so = sorted(s.league.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; return <>
                 <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={96} /></div>
                 <div className="rs-score"><span>{rk}위</span><i>/ 8팀</i></div>
@@ -164,9 +165,11 @@ export function App() {
                     <div className="rs-tile"><b>{s.league.log.filter(x => x.played).length}</b><small>직접 뛴 경기</small></div>
                     <div className="rs-tile"><b>{s.league.log.reduce((a, c) => a + c.goals, 0)} / {s.league.log.reduce((a, c) => a + c.assists, 0)}</b><small>골 / 도움</small></div>
                 </div></>; })()}
-            <p className="rs-hint">이 버전은 여기까지. 다음 시즌은 아직 없다.</p>
+            {(s.hist ?? []).length > 0 && <p className="rs-hint">지난 시즌: {(s.hist ?? []).map(h => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`).join(', ')}</p>}
+            <p className="rs-hint">다음 시즌은 같은 능력치로 새 8팀 리그를 치른다. 이번 시즌 순위는 기록으로 남는다. 시즌 사이 성장과 이적은 아직 없다.</p>
             <Table lg={s.league} />
-            <Btn onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
+            <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (능력치 유지)`}</Btn>
+            <Btn kind="secondary" onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
         </Group>}
         {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
