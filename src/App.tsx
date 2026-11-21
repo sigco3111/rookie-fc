@@ -119,8 +119,8 @@ export function App() {
             </div>
             <Bars s={s.stats} />
             {s.trained && s.tr && <div className="rs-grow"><strong>이번 훈련 성장</strong><span className="rs-chip">{s.tr}</span></div>}
-            <p className="rs-hint">경기 전 훈련 하나를 고른다. 숫자는 오르는 양.</p>
-            <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} +{POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2}</Btn>)}</div>
+            <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
+            <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} {s.stats[k.key]}{s.trained ? '' : '→' + clamp(s.stats[k.key] + (POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2), 0, 99)}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
         </Group>}
         {!playing && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
