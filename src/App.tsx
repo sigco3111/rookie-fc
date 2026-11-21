@@ -168,7 +168,7 @@ export function App() {
                 </div></>; })()}
             {(s.hist ?? []).length > 0 && <p className="rs-hint">지난 시즌: {(s.hist ?? []).map(h => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`).join(', ')}</p>}
             {(() => { const rk = sorted(s.league.teams).findIndex(t => t.id === 0) + 1; const to = proGrow(s.stats, s.pos, rk); return <Callout>성장 예정: {SK.map(k => `${k.name} ${s.stats[k.key]}→${to[k.key]}`).join(', ')}</Callout>; })()}
-            <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 주 능력치 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
+            <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 {s.pos === 'FW' ? '공격수' : s.pos === 'MF' ? '미드필더' : '수비수'}의 핵심 능력치({(POS.find(p => p.id === s.pos) || POS[0]).key.map(k => SK.find(x => x.key === k)!.name).join('·')})는 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지는 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
             <Table lg={s.league} />
             <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn>
             <Btn kind="secondary" onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
