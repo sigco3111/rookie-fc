@@ -63,12 +63,12 @@ function giveBall(m: Match, p: Player) {
 function switchTo(m: Match, p: Player) { const o = m.players[m.humanId]; if (o === p || p.role === 'GK') return; o.human = false; p.human = true; m.humanId = p.id; }
 // 슛 방향 규칙: 이동 스틱의 좌우 성분(|mx| > 0.25)이 있으면 그 쪽 골대 구석(중앙에서 최대 GOAL_HALF*0.8)을 노린다.
 // 스틱을 안 쓰거나 거의 중앙이면 이전처럼 골대 중앙 근처 무작위. 골대 반대(뒤쪽) 입력은 방향에 쓰이지 않는다.
-export const TUNE = { aim: true, aimDead: 0.25, aimReach: 0.8, gkReach: 1.4, gkTrack: 0.2, gkReachOwn: 1.9, gkTrackOwn: 0.35 } // gk*는 상대(team 1) 키퍼, gk*Own은 내 팀 키퍼(예전 값 유지);
+export const TUNE = { aim: true, aimDead: 0.25, aimReach: 0.8, aimErrMul: 0.6, gkReach: 1.4, gkTrack: 0.2, gkReachOwn: 1.9, gkTrackOwn: 0.35 } // gk*는 상대(team 1) 키퍼, gk*Own은 내 팀 키퍼(예전 값 유지);
 function shoot(m: Match, p: Player, power: number, aim?: number) {
     const gz = p.team === 0 ? 0 : L; const useAim = TUNE.aim && aim !== undefined && Math.abs(aim) > TUNE.aimDead;
     const gx = useAim ? W / 2 + Math.sign(aim!) * Math.min(1, Math.abs(aim!)) * GOAL_HALF * TUNE.aimReach : W / 2 + (Math.random() - 0.5) * GOAL_HALF * 1.2;
     let dx = gx - p.x, dz = gz - p.z; const n = Math.hypot(dx, dz); dx /= n; dz /= n;
-    const err = (1 - p.st.shoot / 100) * 0.55 * (0.6 + power * 0.7) * (Math.random() * 2 - 1);
+    const err = (1 - p.st.shoot / 100) * 0.55 * (0.6 + power * 0.7) * (Math.random() * 2 - 1) * (useAim ? TUNE.aimErrMul : 1);
     const c = Math.cos(err), s = Math.sin(err); const rx = dx * c - dz * s, rz = dx * s + dz * c;
     p.kick = { t: 0, type: 'shoot', dx: rx, dz: rz, power, target: null, done: false }; p.h = Math.atan2(rz, rx);
 }
