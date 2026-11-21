@@ -167,7 +167,9 @@ export function App() {
                     <div className="rs-tile"><b>{s.league.log.filter(x => x.played).length}</b><small>직접 뛴 경기</small></div>
                     <div className="rs-tile"><b>{s.league.log.reduce((a, c) => a + c.goals, 0)} / {s.league.log.reduce((a, c) => a + c.assists, 0)}</b><small>골 / 도움</small></div>
                 </div></>; })()}
-            {(s.hist ?? []).length > 0 && <p className="rs-hint">지난 시즌: {(s.hist ?? []).map(h => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`).join(', ')}</p>}
+            {(s.hist ?? []).length > 0 && (() => { const H = s.hist ?? [], fmt = (h: { n: number; rk: number; pts: number }) => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`, K = 4; return <>
+                <p className="rs-hint">지난 시즌: {H.slice(-K).map(fmt).join(', ')}</p>
+                {H.length > K && <details className="rs-info"><summary>이전 시즌 기록 보기 ({H.length - K})</summary><p className="rs-hint">{H.slice(0, -K).map(fmt).join(', ')}</p></details>}</>; })()}
             {(() => { const rk = sorted(s.league.teams).findIndex(t => t.id === 0) + 1; const to = proGrow(s.stats, s.pos, rk); return <Callout>성장 예정: {SK.map(k => `${k.name} ${s.stats[k.key]}→${to[k.key]}`).join(', ')}</Callout>; })()}
             <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 {s.pos === 'FW' ? '공격수' : s.pos === 'MF' ? '미드필더' : '수비수'}의 핵심 능력치({(POS.find(p => p.id === s.pos) || POS[0]).key.map(k => SK.find(x => x.key === k)!.name).join('·')})는 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지는 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
             <Table lg={s.league} />
