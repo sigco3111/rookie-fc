@@ -10,7 +10,7 @@ const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' },
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean }[]; lastMsg: string }
-interface Save { v: 1; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null; proSeason?: number; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
+interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null; proSeason?: number; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, proRes: null, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -89,7 +89,7 @@ export function App() {
         if (s.season >= SEASONS) { const b: Stats = { ...s.stats }; const L2 = s.legacy + 3; (Object.keys(b) as (keyof Stats)[]).forEach(k => { b[k] = clamp(b[k] + 3, 0, 99); }); set({ phase: 'home', season: 1, game: 0, trust: 40, ratings: [], stats: b, trained: false, attempts: s.attempts + 1, legacy: L2, evalRes: null }); }
         else set({ phase: 'home', season: s.season + 1, game: 0, ratings: [], trained: false, evalRes: null });
     };
-    const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const ns = proGrow(s.stats, s.pos, rk); const myStr = Math.round(60 + (avgKey(ns, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], stats: ns, proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
+    const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const ns = proGrow(s.stats, s.pos, rk); const myStr = Math.round(60 + (avgKey(ns, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], stats: ns, grow: { n, rk, from: s.stats, to: ns }, proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
     const startLeague = () => { const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ league: newLeague(myStr), phase: 'league' }); };
     const playRound = () => { const lg = s.league!; const o = lg.teams[myFixture(lg)]; setKey(k => k + 1); setPlaying({ oppStr: o.str, team: true, kind: 'pro' }); };
     const autoRound = () => { const lg = s.league!; const me = lg.teams[0], o = lg.teams[myFixture(lg)]; const gm = poisson(1.3 * Math.pow(me.str / o.str, 1.3)), go = poisson(1.3 * Math.pow(o.str / me.str, 1.3)); const nl = applyRound(lg, [gm, go]); set({ league: nl, phase: nl.round >= 14 ? 'leagueEnd' : 'league' }); };
@@ -147,6 +147,7 @@ export function App() {
             <Btn onClick={startLeague}>1군 리그 시작</Btn>
         </Group>}
         {!playing && s.phase === 'league' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 리그 ${s.league.round + 1}/14라운드`} heading>
+            {s.grow && s.league.round === 0 && <Callout>{s.grow.n}시즌 성장 ({s.grow.rk}위): {SK.map(k => `${k.name} ${s.grow!.from[k.key]}→${s.grow!.to[k.key]}`).join(', ')}</Callout>}
             {s.league.lastMsg && <Callout>지난 경기: {s.league.lastMsg}</Callout>}
             <div className="rs-tiles rs-vs">
                 <div className="rs-tile"><b>{s.league.teams[0].str}</b><small>우리 구단 강함</small></div>
@@ -166,6 +167,7 @@ export function App() {
                     <div className="rs-tile"><b>{s.league.log.reduce((a, c) => a + c.goals, 0)} / {s.league.log.reduce((a, c) => a + c.assists, 0)}</b><small>골 / 도움</small></div>
                 </div></>; })()}
             {(s.hist ?? []).length > 0 && <p className="rs-hint">지난 시즌: {(s.hist ?? []).map(h => `${h.n}시즌 ${h.rk}위(승점 ${h.pts})`).join(', ')}</p>}
+            {(() => { const rk = sorted(s.league.teams).findIndex(t => t.id === 0) + 1; const to = proGrow(s.stats, s.pos, rk); return <Callout>성장 예정: {SK.map(k => `${k.name} ${s.stats[k.key]}→${to[k.key]}`).join(', ')}</Callout>; })()}
             <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 주 능력치 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
             <Table lg={s.league} />
             <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn>
