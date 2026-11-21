@@ -75,3 +75,4 @@ html { background-color: #0f1b2d; }
 
 .rs-vs { grid-template-columns: 1fr auto 1fr; align-items: center; }
 .rs-vsm { font-weight: 800; color: var(--ds-ink-2); font-size: 18px; }
+.rs-tile, .rs-score, .rs-bar, .rs-center, .rs-grow, .rs-tiles { -webkit-user-select: none; user-select: none; }
