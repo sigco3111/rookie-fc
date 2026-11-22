@@ -10,8 +10,8 @@ const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' },
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean; sc?: [number, number]; vs?: string }[]; lastMsg: string }
-interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proRes: null; proSeason?: number; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
-const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, proRes: null, league: null };
+interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proSeason?: number; sg?: number; sa?: number; sgn?: number; yhist?: { n: number; avg: number; ok: boolean; g?: number; a?: number }[]; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
+const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
 function schedule(): number[][][] {
@@ -69,6 +69,7 @@ function Backup({ save, onRestore }: { save: Save; onRestore: (v: Save) => void 
         {msg && <p className="rs-hint">{msg}</p>}
     </details>;
 }
+const fmtY = (h: { n: number; avg: number; ok: boolean; g?: number; a?: number }) => `${h.n}시즌 평균 ${h.avg.toFixed(1)}${h.g !== undefined ? ` · ${h.g}골 ${h.a}도움` : ''} · ${h.ok ? '승격' : '미달'}`;
 function Bars({ s }: { s: Stats }) {
     return <div className="rs-bars">{SK.map(k => <div key={k.key} className="rs-bar"><span>{k.name}</span><div><i style={{ width: `${clamp(s[k.key], 0, 100)}%` }} /></div><b>{s[k.key]}</b></div>)}</div>;
 }
@@ -80,7 +81,7 @@ export function App() {
     const set = (p: Partial<Save>) => { if (saved.ready) setSave({ ...save, ...p }); };
     const s = save;
 
-    const startMatch = () => { setKey(k => k + 1); setPlaying({ oppStr: 44 + (s.season - 1) * 5 + s.game * 3 + s.attempts * 0, team: false, kind: 'youth' }); };
+    const startMatch = () => { setKey(k => k + 1); setPlaying({ oppStr: 44 + (s.season - 1) * 5 + s.game * 3, team: false, kind: 'youth' }); };
     const train = (k: keyof Stats) => {
         const posd = POS.find(p => p.id === s.pos)!; const gain = posd.key.includes(k) ? 3 : 2;
         set({ stats: { ...s.stats, [k]: clamp(s.stats[k] + gain, 0, 99) }, trained: true, tr: `${SK.find(x => x.key === k)!.name} +${gain}` });
@@ -91,7 +92,7 @@ export function App() {
         const trustD = trustDelta(r.rating); const stats = { ...s.stats }; let grew = '';
         const bump = (k: keyof Stats) => { stats[k] = clamp(stats[k] + 1, 0, 99); grew = grew ? grew + ', ' + SK.find(x => x.key === k)!.name : SK.find(x => x.key === k)!.name; };
         if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); let gb = false; if (!grew) { bump(POS.find(p => p.id === s.pos)!.key[0]); gb = true; }
-        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
+        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], sg: (s.sg ?? 0) + r.rec.goals, sa: (s.sa ?? 0) + r.rec.assists, sgn: (s.sgn ?? 0) + 1, last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
     };
     const afterResult = () => {
         if (s.game + 1 >= MATCHES_PER_SEASON) {
@@ -104,9 +105,13 @@ export function App() {
     };
     const afterEval = () => {
         const e = s.evalRes!;
-        if (e.ok) { set({ phase: 'pro' }); return; }
-        if (s.season >= SEASONS) { const b: Stats = { ...s.stats }; const L2 = s.legacy + 3; (Object.keys(b) as (keyof Stats)[]).forEach(k => { b[k] = clamp(b[k] + 3, 0, 99); }); set({ phase: 'home', season: 1, game: 0, trust: 40, ratings: [], stats: b, trained: false, attempts: s.attempts + 1, legacy: L2, evalRes: null }); }
-        else set({ phase: 'home', season: s.season + 1, game: 0, ratings: [], trained: false, evalRes: null });
+        const avg = s.ratings.length ? s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length : 0;
+        const rec: { n: number; avg: number; ok: boolean; g?: number; a?: number } = { n: s.season, avg: Math.round(avg * 100) / 100, ok: e.ok };
+        if (s.ratings.length > 0 && (s.sgn ?? 0) >= s.ratings.length) { rec.g = s.sg ?? 0; rec.a = s.sa ?? 0; }
+        const yhist = [...(s.yhist ?? []), rec];
+        if (e.ok) { set({ phase: 'pro', yhist, sg: 0, sa: 0, sgn: 0 }); return; }
+        if (s.season >= SEASONS) { const b: Stats = { ...s.stats }; const L2 = s.legacy + 3; (Object.keys(b) as (keyof Stats)[]).forEach(k => { b[k] = clamp(b[k] + 3, 0, 99); }); set({ phase: 'home', season: 1, game: 0, trust: 40, ratings: [], stats: b, trained: false, attempts: s.attempts + 1, legacy: L2, evalRes: null, yhist, sg: 0, sa: 0, sgn: 0 }); }
+        else set({ phase: 'home', season: s.season + 1, game: 0, ratings: [], trained: false, evalRes: null, yhist, sg: 0, sa: 0, sgn: 0 });
     };
     const nextProSeason = () => { const lg = s.league!; const so = sorted(lg.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; const n = s.proSeason ?? 1; const rec = { n, rk, pts: pts(me), g: lg.log.reduce((a, c) => a + c.goals, 0), a: lg.log.reduce((a, c) => a + c.assists, 0) }; const ns = proGrow(s.stats, s.pos, rk); const myStr = Math.round(60 + (avgKey(ns, s.pos) - 55) * 0.3); set({ hist: [...(s.hist ?? []), rec], stats: ns, grow: { n, rk, from: s.stats, to: ns }, proSeason: n + 1, league: newLeague(myStr), phase: 'league' }); };
     const startLeague = () => { const myStr = Math.round(60 + (avgKey(s.stats, s.pos) - 55) * 0.3); set({ league: newLeague(myStr), phase: 'league' }); };
@@ -139,6 +144,7 @@ export function App() {
             <Bars s={s.stats} />
             {s.trained && s.tr && <div className="rs-grow"><strong>이번 훈련 성장</strong><span className="rs-chip">{s.tr}</span></div>}
             {s.ratings.length > 0 && <p className="rs-hint">이번 시즌 평점: {s.ratings.map(r => r.toFixed(1)).join(' · ')} (평균 {(s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length).toFixed(1)})</p>}
+            {(s.yhist ?? []).length > 0 && <p className="rs-hint">유스 기록: {s.yhist!.map(fmtY).join(' / ')}</p>}
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} {s.stats[k.key]}{s.trained ? '' : '→' + clamp(s.stats[k.key] + (POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2), 0, 99)}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
@@ -161,10 +167,12 @@ export function App() {
                 {([['능력치', s.evalRes.ability, 40], ['경기 활약', s.evalRes.perf, 35], ['감독 신뢰', s.evalRes.trust, 25]] as [string, number, number][]).map(([k, v, mx]) => <div key={k} className="rs-bar rs-bar-w"><span>{k}</span><div><i style={{ width: `${Math.min(100, v / mx * 100)}%` }} /></div><b>{v}/{mx}</b></div>)}
             </div>
             <p className="rs-hint rs-mid">경기 활약 {s.evalRes.perf}/35점은 이번 시즌 평균 평점 {(s.ratings.length ? s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length : 0).toFixed(1)} 기준. 평균 5.0이면 0점, 8.0이면 만점.</p>
+            {(s.yhist ?? []).length > 0 && <p className="rs-hint rs-mid">유스 기록: {s.yhist!.map(fmtY).join(' / ')}</p>}
             {!s.evalRes.ok && <div className="rs-grow"><strong>만점까지 가장 많이 남은 항목</strong><span className="rs-chip">{s.evalRes.missing}</span><small className="rs-hint">{s.evalRes.missing === '능력치' ? '훈련으로 능력치를 올린다.' : s.evalRes.missing === '경기 활약' ? '평균 평점이 오르면 상승 (8.0이면 만점).' : '경기 평점이 높을수록 감독 신뢰가 더 많이 오른다.'}</small></div>}
             <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 능력치 +3, 신뢰 40 시작)' : '다음 시즌'}</Btn>
         </Group>}
         {!playing && s.phase === 'pro' && <Group label="1군 승격" heading>
+            {(s.yhist ?? []).length > 0 && <Callout>유스 기록: {s.yhist!.map(fmtY).join(' / ')}</Callout>}
             <Callout>승격 후에는 팀 전체를 조작한다. 공을 가진 선수는 직접, 나머지는 AI. 전환 버튼으로 가까운 선수로 바꾼다. 가상 구단 8팀 풀리그(14라운드)이고 직접 뛰지 않는 라운드는 자동 진행한다.</Callout>
             <Btn onClick={startLeague}>1군 리그 시작</Btn>
         </Group>}
