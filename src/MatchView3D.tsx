@@ -4,6 +4,9 @@ import hudUrl from './models/hud.woff?url';
 import { loadAssets, Rig, T } from './rig';
 
 const CW = 390, CH = 590;
+declare const __TEST_HOOKS__: boolean;
+const DBG = typeof __TEST_HOOKS__ !== 'undefined' && __TEST_HOOKS__ && typeof location !== 'undefined' && new URLSearchParams(location.search).has('dbg');
+const FASTN = DBG ? Math.max(1, Math.min(90, parseInt(new URLSearchParams(location.search).get('fast') || '1', 10) || 1)) : 1;
 export interface Result { score: [number, number]; rec: Rec; rating: number }
 
 function pitchTexture() {
@@ -75,8 +78,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
-                    if (!paused.current) step(m, dt, inputObj); I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (!paused.current) { if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, inputObj); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
                     const hu = m.players[m.humanId]; const want = m.ball.owner === hu ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
+                    if (DBG) { (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge }; }
                     m.players.forEach((p, i) => {
                         const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
