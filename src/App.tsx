@@ -138,6 +138,7 @@ export function App() {
             </div>
             <Bars s={s.stats} />
             {s.trained && s.tr && <div className="rs-grow"><strong>이번 훈련 성장</strong><span className="rs-chip">{s.tr}</span></div>}
+            {s.ratings.length > 0 && <p className="rs-hint">이번 시즌 평점: {s.ratings.map(r => r.toFixed(1)).join(' · ')} (평균 {(s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length).toFixed(1)})</p>}
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} {s.stats[k.key]}{s.trained ? '' : '→' + clamp(s.stats[k.key] + (POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2), 0, 99)}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
@@ -159,6 +160,7 @@ export function App() {
             <div className="rs-bars">
                 {([['능력치', s.evalRes.ability, 40], ['경기 활약', s.evalRes.perf, 35], ['감독 신뢰', s.evalRes.trust, 25]] as [string, number, number][]).map(([k, v, mx]) => <div key={k} className="rs-bar rs-bar-w"><span>{k}</span><div><i style={{ width: `${Math.min(100, v / mx * 100)}%` }} /></div><b>{v}/{mx}</b></div>)}
             </div>
+            <p className="rs-hint rs-mid">경기 활약 {s.evalRes.perf}/35점은 이번 시즌 평균 평점 {(s.ratings.length ? s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length : 0).toFixed(1)} 기준. 평균 5.0이면 0점, 8.0이면 만점.</p>
             {!s.evalRes.ok && <div className="rs-grow"><strong>만점까지 가장 많이 남은 항목</strong><span className="rs-chip">{s.evalRes.missing}</span><small className="rs-hint">{s.evalRes.missing === '능력치' ? '훈련으로 능력치를 올린다.' : s.evalRes.missing === '경기 활약' ? '평균 평점이 오르면 상승 (8.0이면 만점).' : '경기 평점이 높을수록 감독 신뢰가 더 많이 오른다.'}</small></div>}
             <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 능력치 +3, 신뢰 40 시작)' : '다음 시즌'}</Btn>
         </Group>}
