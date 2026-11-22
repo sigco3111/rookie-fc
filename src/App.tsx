@@ -146,6 +146,7 @@ export function App() {
             {s.ratings.length > 0 && <p className="rs-hint">이번 시즌 평점: {s.ratings.map(r => r.toFixed(1)).join(' · ')} (평균 {(s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length).toFixed(1)})</p>}
             {(s.yhist ?? []).length > 0 && <p className="rs-hint">유스 기록: {s.yhist!.map(fmtY).join(' / ')}</p>}
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
+            <p className="rs-hint">경기에서는 슛과 골을 합해 2회 이상이면 슛, 패스 성공 3회 이상이면 패스, 태클 1회 이상이면 수비가 오른다. 어느 조건도 못 채우면 포지션 핵심 능력치가 기본으로 오르고, 드리블과 속도는 경기로는 오르지 않는다.</p>
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} {s.stats[k.key]}{s.trained ? '' : '→' + clamp(s.stats[k.key] + (POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2), 0, 99)}</Btn>)}</div>
             <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
         </Group>}
