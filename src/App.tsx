@@ -1,8 +1,13 @@
 import { POS, avgKeyOf, abilityScore, perfScore, trustScore, trustDelta, needFor } from './growth';
 import { MiniPortrait, LOOKS } from './MiniPortrait';
 import React, { useState } from 'react';
-import { Callout, Closing, Facts, FileCard, Group, Header, useLocalState } from './ui';
+import { Callout, Closing, Facts, FileCard, Group, Header, useLocalState, type StoreBlock } from './ui';
 import { MatchView, type Result } from './MatchView3D';
+import { validateSave, normalizeSave } from './saveGuard';
+declare const __TEST_HOOKS__: boolean;
+// 검증 통과 뒤 정상 구버전 저장의 누락 하위 필드를 채운다(로드·복원 공통)
+const checkSave = (o: any): string | null => { const bad = validateSave(o); if (bad) return bad; normalizeSave(o); return null; };
+const CRASH = typeof __TEST_HOOKS__ !== 'undefined' && __TEST_HOOKS__ && typeof location !== 'undefined' && new URLSearchParams(location.search).has('crash');
 import type { Pos, Stats } from './engine';
 
 const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' }, { key: 'pass', name: '패스' }, { key: 'dribble', name: '드리블' }, { key: 'defense', name: '수비' }, { key: 'speed', name: '속도' }];
@@ -50,24 +55,44 @@ function Btn({ children, onClick, kind = 'primary', disabled }: { children: Reac
 function Table({ lg }: { lg: League }) {
     return <table className="rs-table"><thead><tr><th>순</th><th>팀</th><th>경기</th><th>승무패</th><th>득실</th><th>승점</th></tr></thead><tbody>{sorted(lg.teams).map((t, i) => <tr key={t.id} className={t.id === 0 ? 'rs-me' : ''}><td>{i + 1}</td><td>{t.n}</td><td>{t.p}</td><td>{t.w}-{t.d}-{t.l}</td><td>{t.gf - t.ga}</td><td><b>{pts(t)}</b></td></tr>)}</tbody></table>;
 }
-function Backup({ save, onRestore }: { save: Save; onRestore: (v: Save) => void }) {
+function Backup({ save, onRestore, persist }: { save: Save; onRestore: (v: Save) => void; persist: (v: Save) => boolean }) {
     const [code, setCode] = useState(''); const [msg, setMsg] = useState('');
     const enc = (o: unknown) => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
     const dec = (t: string) => JSON.parse(decodeURIComponent(escape(atob(t))));
     const doExport = () => { try { setCode(enc(save)); setMsg('아래 코드를 복사해 두면 된다. 이 코드에는 지금까지의 진행이 들어 있다.'); } catch { setMsg('코드를 만들지 못했다.'); } };
     const doImport = () => {
         let o: any = null;
-        try { o = dec(code.trim()); } catch { setMsg('코드를 읽지 못했다. 복사가 잘 됐는지 확인해 달라.'); return; }
-        if (!o || o.v !== 1 || typeof o.phase !== 'string' || !o.stats || typeof o.stats.shoot !== 'number') { setMsg('이 코드는 이 게임의 저장 코드가 아니다.'); return; }
+        try { o = dec(code.trim()); } catch { try { o = JSON.parse(code.trim()); } catch { setMsg('코드를 읽지 못했다. 복사가 잘 됐는지 확인해 달라.'); return; } } // 저장 코드(base64) 또는 원문 JSON 모두 받는다
+        const bad = checkSave(o);
+        if (bad) { setMsg('이 코드는 이 게임의 저장 코드가 아니다(' + bad + ').'); return; }
         if (!window.confirm('지금 진행을 지우고 이 코드의 진행으로 바꿀까?')) return;
-        onRestore({ ...initial, ...o }); setMsg('불러왔다.');
+        let cur: string | null;
+        try { cur = localStorage.getItem('rookie-soccer.v1'); } catch { setMsg('지금 진행을 읽을 수 없어 복구를 멈췄다. 저장은 바뀌지 않았다.'); return; }
+        if (cur) { try { localStorage.setItem('rookie-soccer.v1.prerestore', cur); } catch { setMsg('직전 진행 보관에 실패해 복구를 멈췄다. 저장은 바뀌지 않았다.'); return; } } // 보관 실패 시 덮어쓰지 않고 멈춘다
+        const nv = { ...initial, ...o };
+        if (!persist(nv)) { setMsg('저장소에 쓰지 못해 복구를 멈췄다. 기존 저장은 그대로다. 브라우저 저장 설정을 확인해 달라.'); return; } // 주 저장 쓰기 실패 시 복구 성공으로 안내하지 않는다
+        onRestore(nv); setMsg(cur ? '불러왔다. (직전 진행은 이 브라우저에 한 벌 보관됐다.)' : '불러왔다.');
     };
     return <details className="rs-info"><summary>저장 백업·복구</summary>
         <p className="rs-hint">진행은 이 브라우저에만 저장된다. 코드를 복사해 두면 저장이 지워져도, 다른 기기나 브라우저에서도 이어 할 수 있다.</p>
         <div className="rs-row"><Btn kind="secondary" onClick={doExport}>코드 만들기</Btn><Btn kind="secondary" onClick={doImport} disabled={!code.trim()}>이 코드로 복구</Btn></div>
-        <textarea className="rs-input" style={{ width: '100%', minHeight: 64, boxSizing: 'border-box', resize: 'vertical' }} value={code} onChange={e => setCode(e.target.value)} placeholder="저장 코드" />
+        <textarea className="rs-input" style={{ width: '100%', minHeight: 64, boxSizing: 'border-box', resize: 'vertical' }} value={code} onChange={e => setCode(e.target.value)} placeholder="저장 코드 또는 원문 JSON" />
         {msg && <p className="rs-hint">{msg}</p>}
     </details>;
+}
+function CorruptScreen({ block, resetFailed, onReset }: { block: StoreBlock; resetFailed: boolean; onReset: () => void }) {
+    const [confirming, setConfirming] = useState(false);
+    if (block.kind === 'unreadable') return <>
+        <Callout>저장소를 읽을 수 없어 진행을 열지 못했다. 저장된 데이터는 건드리지 않은 상태다. 브라우저가 이 사이트의 저장을 막고 있지 않은지 확인한 뒤 다시 열어 달라.</Callout>
+    </>;
+    return <>
+        <Callout>저장된 진행 데이터가 손상되어 열 수 없다. 원본은 그대로 보존되어 있다{block.asideOk ? '(이 브라우저에 별도 사본도 보관했다)' : '(별도 사본 보관에 실패했다. 아래 코드를 직접 복사해 보관해 달라)'}.</Callout>
+        <details className="rs-info" open={!block.asideOk}><summary>손상된 원본 보기(원문 JSON — 보관용, 고친 뒤 복구 입력에 붙여 복원 가능)</summary><textarea className="rs-input" readOnly style={{ width: '100%', minHeight: 96, boxSizing: 'border-box' }} value={block.raw} /></details>
+        {resetFailed && <Callout>원본을 지우지 못해 새로 시작을 멈췄다. 저장된 데이터는 그대로다. 브라우저 저장 설정을 확인한 뒤 다시 시도해 달라.</Callout>}
+        {!confirming
+            ? <Btn kind="secondary" onClick={() => setConfirming(true)}>새로 시작</Btn>
+            : <Callout>새로 시작하면 손상된 원본은 지워진다. {block.asideOk ? '별도 사본은 남는다. ' : ''}정말 진행할까? <Btn kind="secondary" onClick={onReset}>삭제하고 새로 시작</Btn></Callout>}
+    </>;
 }
 const fmtY = (h: { n: number; avg: number; ok: boolean; g?: number; a?: number }) => `${h.n}시즌 평균 ${h.avg.toFixed(1)}${h.g !== undefined ? ` · ${h.g}골 ${h.a}도움` : ''} · ${h.ok ? '승격' : '미달'}`;
 function Bars({ s }: { s: Stats }) {
@@ -75,11 +100,16 @@ function Bars({ s }: { s: Stats }) {
 }
 
 export function App() {
-    const [save, setSave, saved] = useLocalState<Save>('rookie-soccer.v1', initial);
+    const [save, setSave, saved] = useLocalState<Save>('rookie-soccer.v1', initial, checkSave);
     const [playing, setPlaying] = useState<null | { oppStr: number; team: boolean; kind: 'youth' | 'pro' }>(null);
     const [key, setKey] = useState(0);
+    if (CRASH) throw new Error('verify-crash');
     const set = (p: Partial<Save>) => { if (saved.ready) setSave({ ...save, ...p }); };
     const s = save;
+    if (saved.corrupt) return <FileCard>
+        <Header title="루키나인 축구" fact="유스에서 키워 1군으로. 7대7" />
+        <CorruptScreen block={saved.corrupt} resetFailed={saved.resetFailed} onReset={saved.reset} />
+    </FileCard>;
 
     const startMatch = () => { setKey(k => k + 1); setPlaying({ oppStr: 44 + (s.season - 1) * 5 + s.game * 3, team: false, kind: 'youth' }); };
     const train = (k: keyof Stats) => {
@@ -207,9 +237,9 @@ export function App() {
             <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn>
             <Btn kind="secondary" onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
-            <Backup save={s} onRestore={v => { if (saved.ready) setSave(v); }} />
+            <Backup save={s} onRestore={v => { if (saved.ready) setSave(v); }} persist={saved.persist} />
         </Group>}
-        {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Backup save={s} onRestore={v => { if (saved.ready) setSave(v); }} /><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
+        {!playing && s.phase !== 'new' && s.phase !== 'leagueEnd' && <div className="rs-foot"><Backup save={s} onRestore={v => { if (saved.ready) setSave(v); }} persist={saved.persist} /><Btn kind="secondary" onClick={reset}>처음부터 다시</Btn></div>}
         <details className="rs-info"><summary>이 버전의 한계와 출처</summary><Group label="이 버전의 한계" heading>
             <Facts items={[
                 { label: '모델과 동작', value: '실제 3D. Kenney 3번 캐릭터 모델, 달리기와 대기는 Kenney 동작, 킥은 CMU 모션캡처를 3번 뼈대에 옮겨 입힌 것. 육성 화면의 선수는 Kenney 4번(Mini Characters, CC0)' },
@@ -219,4 +249,4 @@ export function App() {
         </Group></details>
         <Closing>시험 버전. 규칙과 수치는 바뀔 수 있다.</Closing>
     </FileCard>;
-}
+                }
