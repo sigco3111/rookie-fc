@@ -249,4 +249,4 @@ export function App() {
         </Group></details>
         <Closing>시험 버전. 규칙과 수치는 바뀔 수 있다.</Closing>
     </FileCard>;
-                }
+}
