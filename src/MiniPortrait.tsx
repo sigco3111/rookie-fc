@@ -7,6 +7,8 @@ import * as SU from 'three/examples/jsm/utils/SkeletonUtils.js';
 import * as fflate from 'fflate';
 import zipUrl from './models/mini.zip?url';
 const ORIG = typeof location !== 'undefined' && location.search.includes('orig=1');
+declare const __TEST_HOOKS__: boolean;
+const PROT_ON = typeof __TEST_HOOKS__ !== 'undefined' && __TEST_HOOKS__;
 
 export const LOOKS = ['male-a', 'male-c', 'male-e', 'female-a', 'female-c', 'female-e'];
 let cache: Promise<any> | null = null;
@@ -83,6 +85,10 @@ function kitGroups(o: any, base: HTMLCanvasElement, headSet: Set<string>) {
     for (const t of tris) { const [r, gg, bl] = t.cl; const mx = Math.max(r, gg, bl), mn = Math.min(r, gg, bl); const sat = mx ? (mx - mn) / mx : 0; const df = mx - mn; let hu = df ? (mx === r ? ((gg - bl) / df + 6) % 6 : mx === gg ? (bl - r) / df + 2 : (r - gg) / df + 4) * 60 : 0;
         // 팔 뼈가 짊어진 삼각형: 팔 관절에서 먼 끝(손)은 룩의 피부색으로, 손보다 더 나간 긴 소매 자락(female-a)은 셔츠색으로. 장갑이 원래 디자인인 룩 3, 6도 손이 피부가 된다.
         if (t.d >= 0) {
+            if (puffy) { // 부푼 소매: 거리 대신 원본 색으로 손(피부색·어두운 장갑)과 소매(그 외 색)를 가른다. 모델·텍스처는 그대로, 색 배정만 변경.
+                const skinT = hu >= 5 && hu <= 45 && sat >= 0.15 && sat < 0.7 && mx > 0.35 && r > bl;
+                (skinT ? D : mx < 0.35 ? A : B).push(t.a, t.b, t.c); continue;
+            }
             if (t.d >= handLo) { D.push(t.a, t.b, t.c); continue; }
             if (t.d >= 0.18 && mx < 0.35) { D.push(t.a, t.b, t.c); continue; } // 손목 아래 어두운 장갑 조각도 손으로
         }
@@ -106,7 +112,8 @@ export function MiniPortrait({ look, size = 160 }: { look: number; size?: number
             const bb2 = new T.Box3().setFromObject(m, true); m.position.y -= bb2.min.y; m.position.x -= (bb2.min.x + bb2.max.x) / 2; sc.add(m);
             cam.position.set(0, 1.0, 5.2); cam.lookAt(0, 0.9, 0);
             const clip = (src.animations || []).find((a: any) => a.name === 'idle'); const mixer = new T.AnimationMixer(m); if (clip) mixer.clipAction(clip).play(); mixer.update(0.01); let last = performance.now();
-            const t0 = performance.now(); const tick = () => { if (dead) return; const nw = performance.now(); mixer.update((nw - last) / 1000); last = nw; m.rotation.y = 0.25 + Math.sin((performance.now() - t0) / 1100) * 0.3; r.render(sc, cam); raf = requestAnimationFrame(tick); }; tick();
+            const t0 = performance.now(); const tick = () => { if (dead) return; const nw = performance.now(); mixer.update((nw - last) / 1000); last = nw; m.rotation.y = 0.25 + Math.sin((performance.now() - t0) / 1100) * 0.3;
+                if (PROT_ON) { const pv = parseFloat(new URLSearchParams(location.search).get('prot') || 'NaN'); if (pv === pv) m.rotation.y = pv; } r.render(sc, cam); raf = requestAnimationFrame(tick); }; tick();
         }).catch((e: any) => { cache = null; setErr(String(e && e.message || e)); });
         return () => { dead = true; cancelAnimationFrame(raf); r.dispose(); };
     }, [look, size]);
