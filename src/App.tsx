@@ -187,7 +187,7 @@ export function App() {
             </div>
             <div className="rs-row"><Btn onClick={playRound}>직접 뛰기</Btn><Btn kind="secondary" onClick={autoRound}>자동 진행</Btn></div>
             <Table lg={s.league} />
-            {s.league.log.length > 0 && <details className="rs-info"><summary>라운드 기록 ({s.league.log.length})</summary><p className="rs-hint">{s.league.log.map((e, i) => `${i + 1}R${e.vs ? ' vs ' + e.vs : ''}${e.sc ? ` ${e.sc[0]}:${e.sc[1]}` : ''}${e.played ? ` · 평점 ${e.rating.toFixed(1)}` : ' · 자동'}`).join(' / ')}</p></details>}
+            {s.league.log.length > 0 && <details className="rs-info"><summary>라운드 기록 ({s.league.log.length})</summary><p className="rs-hint">{s.league.log.map((e, i) => `${i + 1}R${e.vs ? ' vs ' + e.vs : ''}${e.sc ? ` ${e.sc[0]}:${e.sc[1]}` : ''}${e.played ? ` · 평점 ${e.rating.toFixed(1)} · ${e.goals}골 ${e.assists}도움` : ' · 자동'}`).join(' / ')}</p></details>}
         </Group>}
         {!playing && s.phase === 'leagueEnd' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 종료`} heading>
             {(() => { const so = sorted(s.league.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; return <>
