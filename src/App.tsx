@@ -15,7 +15,7 @@ const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' },
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean; sc?: [number, number]; vs?: string }[]; lastMsg: string }
-interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proSeason?: number; sg?: number; sa?: number; sgn?: number; yhist?: { n: number; avg: number; ok: boolean; g?: number; a?: number }[]; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
+interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proSeason?: number; sg?: number; sa?: number; sgn?: number; sdg?: { f: number; n: number; w: number; r: number; c: number }; /* 슛 진단 누적: 발사 f, 무소유 릴리스 n, 충전 중 소유 상실 후 릴리스 w, 방출 시점 소유 상실 r, 취소 c (원인 미확정 슛0 조사용 최소 자료) */ yhist?: { n: number; avg: number; ok: boolean; g?: number; a?: number }[]; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -118,11 +118,13 @@ export function App() {
     };
     const finish = (r: Result) => {
         setPlaying(null);
-        if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league' }); return; }
+        const ct = (v: any) => (typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : 0); const rs = r.rec.sdg;
+        const sdg = { f: ct(s.sdg?.f) + ct(r.rec.shots), n: ct(s.sdg?.n) + ct(rs?.n), w: ct(s.sdg?.w) + ct(rs?.w), r: ct(s.sdg?.r) + ct(rs?.r), c: ct(s.sdg?.c) + ct(rs?.c) };
+        if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league', sdg }); return; }
         const trustD = trustDelta(r.rating); const stats = { ...s.stats }; let grew = '';
         const bump = (k: keyof Stats) => { stats[k] = clamp(stats[k] + 1, 0, 99); grew = grew ? grew + ', ' + SK.find(x => x.key === k)!.name : SK.find(x => x.key === k)!.name; };
         if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); let gb = false; if (!grew) { bump(POS.find(p => p.id === s.pos)!.key[0]); gb = true; }
-        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], sg: (s.sg ?? 0) + r.rec.goals, sa: (s.sa ?? 0) + r.rec.assists, sgn: (s.sgn ?? 0) + 1, last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
+        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], sg: (s.sg ?? 0) + r.rec.goals, sa: (s.sa ?? 0) + r.rec.assists, sgn: (s.sgn ?? 0) + 1, sdg, last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
     };
     const afterResult = () => {
         if (s.game + 1 >= MATCHES_PER_SEASON) {
@@ -154,7 +156,7 @@ export function App() {
         <Callout>{saved.message || '진행은 이 기기와 이 브라우저에 저장된다.'}</Callout>
         {playing && <Group label={playing.kind === 'pro' ? '1군 경기: 팀 전체 조작' : `유스 ${s.season}시즌 ${s.game + 1}경기`} heading>
             <MatchView key={key} stats={s.stats} pos={s.pos} oppStr={playing.oppStr} teamControl={playing.team} halfLen={HALF} onFinish={finish} onQuit={() => setPlaying(null)} />
-            <p className="rs-hint">왼쪽 화면을 누른 채 끌어서 이동. 슛은 누르고 있으면 힘이 차고, 뗄 때 스틱을 좌우로 잡고 있으면 그쪽 골대 구석을 노린다(스틱을 안 쓰거나 뒤로 당기면 중앙 쪽). 공이 없을 때 패스 버튼은 태클이다{playing.team ? '. 전환은 가까운 선수로 바꾼다' : ''}. 키보드는 방향키, 스페이스 패스, K 슛{playing.team ? ', Q 전환' : ''}.</p>
+            <p className="rs-hint">왼쪽 화면을 누른 채 끌어서 이동. 슛은 누르고 있으면 힘이 차고, 뗄 때 스틱을 좌우로 잡고 있으면 그쪽 골대 구석을 노린다(스틱을 안 쓰거나 뒤로 당기면 중앙 쪽). 공이 없을 때 패스 버튼은 태클이다{playing.team ? '. 전환은 가까운 선수로 바꾼다' : ''}. 키보드는 WASD·방향키 이동, J·스페이스 패스(공이 없으면 태클), K 홀드 충전 후 떼면 슛, P 일시정지{playing.team ? ', L 전환' : ''}.</p>
         </Group>}
         {!playing && s.phase === 'new' && <Group label="선수 만들기" heading>
             <label className="rs-field">이름<input className="rs-input" value={s.name} maxLength={8} onChange={e => set({ name: e.target.value })} /></label>
@@ -174,6 +176,8 @@ export function App() {
             <Bars s={s.stats} />
             {s.trained && s.tr && <div className="rs-grow"><strong>이번 훈련 성장</strong><span className="rs-chip">{s.tr}</span></div>}
             {s.ratings.length > 0 && <p className="rs-hint">이번 시즌 평점: {s.ratings.map(r => r.toFixed(1)).join(' · ')} (평균 {(s.ratings.reduce((a, c) => a + c, 0) / s.ratings.length).toFixed(1)})</p>}
+            {s.ratings.length === 0 && <p className="rs-hint">이번 시즌 평가 전 — 활약 미집계. 현재 능력치 {abilityScore(s.stats, s.pos)}/40 · 신뢰 {trustScore(s.trust)}/25. 훈련과 경기 성장으로 능력치가, 남은 {MATCHES_PER_SEASON - s.game}경기 평점이 활약과 신뢰를 정한다.</p>}
+            {s.ratings.length > 0 && (() => { const ab = abilityScore(s.stats, s.pos), pf = perfScore(s.ratings), ts = trustScore(s.trust), tot = ab + pf + ts, need = needFor(s.season, SEASONS); const left = MATCHES_PER_SEASON - s.game; return <p className="rs-hint">지금 상태로 평가하면 {tot}점 / 기준 {need}점 (능력치 {ab} · 활약 {pf} · 신뢰 {ts}){left > 0 ? `. 남은 ${left}경기 평점이 활약·신뢰를, 훈련·경기 성장이 능력치를 바꾼다.` : ''}</p>; })()}
             {(s.yhist ?? []).length > 0 && <p className="rs-hint">유스 기록: {s.yhist!.map(fmtY).join(' / ')}</p>}
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
             <p className="rs-hint">경기에서는 슛과 골을 합해 2회 이상이면 슛, 패스 성공 3회 이상이면 패스, 태클 1회 이상이면 수비가 오른다. 어느 조건도 못 채우면 포지션 핵심 능력치가 기본으로 오르고, 드리블과 속도는 경기로는 오르지 않는다.</p>
@@ -188,6 +192,7 @@ export function App() {
             </div>
             <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{s.last!.gb ? '기본 성장 ' : ''}{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
             <p className="rs-hint">경기 평점에 따라 감독 신뢰가 달라진다. 실제 수치는 위에 표시된다.</p>
+            <p className="rs-hint">평점은 골 +1.2, 도움 +0.8, 패스 성공 +0.1(10회까지), 유효슛 +0.2, 태클 +0.3, 패스 실패 -0.05, 이기면 +0.5·비기면 +0.2를 기본 5.5에 더해 매긴다.</p>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
         {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
