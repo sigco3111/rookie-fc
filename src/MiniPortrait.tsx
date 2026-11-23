@@ -106,6 +106,7 @@ export function MiniPortrait({ look, size = 160 }: { look: number; size?: number
         const cam = new T.PerspectiveCamera(30, 1 / 1.25, 0.1, 50);
         load().then(({ models, tex, base }) => {
             if (dead) return; const src = models[LOOKS[look]]; const m = SU.clone(src.scene);
+            if (look === 3) { const dn = models['female-e'].scene.getObjectByName('body-mesh') as any; if (dn) m.traverse((o: any) => { if (o.isMesh && o.name === 'body-mesh') o.geometry = dn.geometry; }); } // 4번 룩: 부푼 소매·막대 팔의 female-a 몸통을 같은 스켈레톤의 female-e 몸통으로 교체(얼굴·머리·애니메이션은 female-a 유지)
             m.traverse((o: any) => { if (o.isMesh) { const TH = 0.45; // female-a 팔 바깥 가는 막대(폭 0.45 초과)만 숨김, 원래 외형은 유지
  if (o.name === 'body-mesh') { const g = o.geometry.clone(); const px = g.attributes.position; const idx = g.index!; const keep: number[] = []; for (let i = 0; i < idx.count; i += 3) { const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2); if (Math.max(Math.abs(px.getX(a)), Math.abs(px.getX(b)), Math.abs(px.getX(c))) <= TH) keep.push(a, b, c); } g.setIndex(keep); o.geometry = g; } o.frustumCulled = false; o.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.9 }); if (look === 1 && o.name === 'head-mesh') capToHair(o, base); if (!ORIG && KIT.includes(look) && o.name === 'body-mesh') kitGroups(o, base, headTex(m, base)); } });
             const bb = new T.Box3().setFromObject(m, true); const h = bb.max.y - bb.min.y; const k = 1.8 / h; m.scale.multiplyScalar(k); m.updateMatrixWorld(true);
