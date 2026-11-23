@@ -26,12 +26,12 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const inp = useRef({ mx: 0, mz: 0, passPressed: false, shootDown: false, shootReleased: false, switchPressed: false, keys: {} as Record<string, boolean> });
     const stick = useRef<{ id: number; ox: number; oy: number } | null>(null);
     const finished = useRef(false);
-    const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number }[]>([]);
-    const passBtn = useRef<HTMLButtonElement>(null);
+    const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
+    const passBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
     const hintSeq = useRef(0);
-    const flash = (t: string) => { const n = ++hintSeq.current; setHint(t); setTimeout(() => { if (hintSeq.current === n) setHint(''); }, 1600); };
+    const flash = (t: string) => { if (DBG) (window as any).__flash = t; const n = ++hintSeq.current; setHint(t); setTimeout(() => { if (hintSeq.current === n) setHint(''); }, 1600); };
     const paused = useRef(false); const [ps, setPs] = useState(false); const [glLost, setGlLost] = useState(false); const glLostRef = useRef(false); const [fatalErr, setFatalErr] = useState(false);
     const setPause = (v: boolean) => { paused.current = v; setPs(v); if (v) { const I = inp.current; I.mx = 0; I.mz = 0; I.shootDown = false; for (const k in I.keys) I.keys[k] = false; } };
     useEffect(() => { const h = () => { if (document.hidden) setPause(true); }; document.addEventListener('visibilitychange', h); return () => document.removeEventListener('visibilitychange', h); }, []);
@@ -92,10 +92,13 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     if (m.rec.tackles > prevTk.current) { prevTk.current = m.rec.tackles; flash('태클로 공을 빼앗았다'); } // 태클 성공 피드백(엔진은 성공 시 rec.tackles만 증가)
                     // 태클 시도 추적: 시작은 조작 선수의 런지 상승 에지, 종료는 시도별 선수 자신의 하강 에지(선수별 직전값 맵). 전환/연속 시도가 겹쳐도 시도 단위로 독립 판정
                     const prevMap = lgPrev.current;
-                    if (hu.lunge > 0 && (prevMap[m.humanId] ?? 0) <= 0) tAtts.current.push({ pid: m.humanId, tk: m.ball.owner && m.ball.owner.team !== hu.team ? m.rec.tackles : -1 });
-                    tAtts.current = tAtts.current.filter(a => { const p = m.players[a.pid]; const pv = prevMap[a.pid] ?? 0; if (p.lunge <= 0 && pv > 0) { if (a.tk >= 0 && m.rec.tackles === a.tk) flash('태클이 빗나갔다'); return false; } return true; });
+                    if (m.ball.owner && m.ball.owner.team !== hu.team) lastOpp.current = { id: m.ball.owner.id, gt: m.t };
+                    if (m.pendingPass && m.pendingPass.from) lastPass.current = { fromId: m.pendingPass.from.id, gt: m.pendingPass.t };
+                    if (hu.lunge > 0 && (prevMap[m.humanId] ?? 0) <= 0) { const opp = m.ball.owner && m.ball.owner.team !== hu.team ? m.ball.owner.id : (m.t - lastOpp.current.gt < 0.15 ? lastOpp.current.id : -1); tAtts.current.push({ pid: m.humanId, tk: m.rec.tackles, ow: opp, gt0: m.t }); }
+                    // 종료 문구는 관측 사실만 쓴다: 실제 패스 이벤트(비행 중 또는 시도 창 안 완료)는 패스, 소유자 불변은 빗나감, 느린 무소유는 루즈볼. 인과가 불명한 나머지(슛 진행·다른 선수 탈취 등)는 오표시를 피해 표시하지 않는다
+                    tAtts.current = tAtts.current.filter(a => { const p = m.players[a.pid]; const pv = prevMap[a.pid] ?? 0; if (p.lunge <= 0 && pv > 0) { if (a.ow >= 0 && m.rec.tackles === a.tk) { const nowOw = m.ball.owner ? m.ball.owner.id : -1; const passedByCarrier = (m.pendingPass && m.pendingPass.from && m.pendingPass.from.id === a.ow) || (lastPass.current.fromId === a.ow && lastPass.current.gt >= a.gt0 - 0.15); if (passedByCarrier) flash('상대가 먼저 패스했다'); else if (nowOw === a.ow) flash('태클이 빗나갔다'); else if (nowOw === -1 && Math.hypot(m.ball.vx, m.ball.vz) < 6) flash('공이 루즈볼이 됐다'); } return false; } return true; });
                     m.players.forEach(p => { prevMap[p.id] = p.lunge; });
-                    if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, chg: Math.round(m.charge * 100) / 100 }; }
+                    if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk + ':' + a.ow); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, chg: Math.round(m.charge * 100) / 100 }; }
                     m.players.forEach((p, i) => {
                         const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
