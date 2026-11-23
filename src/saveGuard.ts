@@ -54,6 +54,7 @@ export function validateSave(o: any): string | null {
             if ((h.g !== undefined && !num(h.g)) || (h.a !== undefined && !num(h.a))) return '1군 기록 원소 수치 오류';
         }
     }
+    if (o.dg !== undefined && !(num(o.dg) && o.dg >= 0 && Math.floor(o.dg) === o.dg)) return '자동 플레이 수치 오류';
     if (o.sdg !== undefined) { // 슛 진단 누적: 쓰는 쪽에서 산술하므로 유한·비음수·정수만 허용
         if (!o.sdg || typeof o.sdg !== 'object' || Array.isArray(o.sdg)) return '진단 수치 형태 오류';
         for (const k of ['f', 'n', 'w', 'r', 'c']) if (o.sdg[k] !== undefined && !(num(o.sdg[k]) && o.sdg[k] >= 0 && Math.floor(o.sdg[k]) === o.sdg[k])) return '진단 수치 오류: ' + k;

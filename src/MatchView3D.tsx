@@ -9,7 +9,37 @@ const DBG = typeof __TEST_HOOKS__ !== 'undefined' && __TEST_HOOKS__ && typeof lo
 const FASTN = DBG ? Math.max(1, Math.min(90, parseInt(new URLSearchParams(location.search).get('fast') || '1', 10) || 1)) : 1;
 const DIAG = DBG ? new URLSearchParams(location.search).get('diag') || '' : '';
 const SKIPRIG = DIAG.includes('norigs'), NOSHADOW = DIAG.includes('noshadow'), NOHUD = DIAG.includes('nohud'), RIGTRACE = DIAG.includes('rigtrace');
-export interface Result { score: [number, number]; rec: Rec; rating: number }
+export interface Result { score: [number, number]; rec: Rec; rating: number; delegated?: boolean }
+
+type Sz = { w: number; h: number; wide: boolean };
+// PC(넓은 가로 화면)에서는 16:9 와이드, 모바일·세로 화면은 기존 390x590 세로 유지
+function computeSz(): Sz {
+    if (typeof window === 'undefined') return { w: CW, h: CH, wide: false };
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (vw >= 700 && vw / vh >= 1.3) {
+        let w = Math.min(Math.round(vw * 0.98), 1600); let h = Math.round(w * 9 / 16);
+        if (h > Math.round(vh * 0.94)) { h = Math.round(vh * 0.94); w = Math.round(h * 16 / 9); }
+        return { w, h, wide: true };
+    }
+    return { w: CW, h: CH, wide: false };
+}
+
+// 자동 플레이 정책(위임 시 사람 입력 대신 이 입력을 엔진에 공급). 엔진 규칙·판정 변경 없음.
+function policy(m: Match, st: { hold: number }, dt: number): Input {
+    const Z: Input = { mx: 0, mz: 0, passPressed: false, shootDown: false, shootReleased: false, switchPressed: false };
+    if (m.state !== 'play') return Z;
+    const H = m.players[m.humanId]; const b = m.ball;
+    if (b.owner === H) {
+        const gd = Math.hypot(H.x - W / 2, H.z);
+        if (st.hold >= 0 || gd < 12) { if (st.hold < 0) st.hold = 0; st.hold += dt; if (st.hold >= 0.55) { st.hold = -1; return { ...Z, shootReleased: true }; } return { ...Z, shootDown: true }; }
+        const dx = W / 2 - H.x, dz = 0 - H.z; const d = Math.hypot(dx, dz) || 1; return { ...Z, mx: dx / d, mz: dz / d };
+    }
+    const dx = b.x - H.x, dz = b.z - H.z; const d = Math.hypot(dx, dz) || 1;
+    const o = b.owner;
+    if (o && o.team !== H.team && d < 1.5 && H.lungeCd <= 0 && !H.kick) return { ...Z, mx: dx / d, mz: dz / d, passPressed: true };
+    if (m.teamControl && o && o.team === H.team) { const mates = m.players.filter(p => p.team === 0 && p !== H); if (mates.some(p => Math.hypot(b.x - p.x, b.z - p.z) < d - 2)) return { ...Z, mx: dx / d, mz: dz / d, switchPressed: true }; }
+    return { ...Z, mx: dx / d, mz: dz / d };
+}
 
 function pitchTexture() {
     const c = document.createElement('canvas'); c.width = 720; c.height = 1200; const g = c.getContext('2d')!; const k = 20; // 1m = 20px
@@ -31,6 +61,13 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const shotCancel = useRef(0); const prevTk = useRef(0); const prevSdgN = useRef(0); const prevSdgW = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
     const passBtn = useRef<HTMLButtonElement>(null); const shootBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
     const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0); const prevBallY = useRef(0); const hdAnim = useRef<Record<number, { t0: number }>>({});
+    const [sz, setSz] = useState<Sz>(computeSz);
+    const szRef = useRef(sz); const renRef = useRef<any>(null); const camRef = useRef<any>(null);
+    const [delegated, setDelegatedState] = useState(false);
+    const delRef = useRef(false); const delUsed = useRef(false); const pol = useRef({ hold: -1 });
+    const setDelegation = (v: boolean) => { delRef.current = v; setDelegatedState(v); if (v) delUsed.current = true; const I = inp.current; I.mx = 0; I.mz = 0; I.shootDown = false; for (const k in I.keys) I.keys[k] = false; pol.current.hold = -1; };
+    useEffect(() => { const onR = () => setSz(prev => { const n = computeSz(); return (n.w === prev.w && n.h === prev.h) ? prev : n; }); window.addEventListener('resize', onR); return () => window.removeEventListener('resize', onR); }, []);
+    useEffect(() => { szRef.current = sz; const r = renRef.current, c = camRef.current; if (r) r.setSize(sz.w, sz.h, false); if (c) { c.aspect = sz.w / sz.h; c.updateProjectionMatrix(); } }, [sz]);
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
     const hintSeq = useRef(0);
@@ -55,7 +92,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         (async () => {
             try {
                 renderer = new T.WebGLRenderer({ canvas: gl.current!, antialias: true });
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(CW, CH, false);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(szRef.current.w, szRef.current.h, false); renRef.current = renderer;
                 // 컨텍스트 손실 처리는 생성 직후에 건다: 모델 로딩(await loadAssets) 중에 끊겨도 안내 배너·일시정지·복구가 동작해야 한다
                 renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLostRef.current = true; setGlLost(true); if (!paused.current) setPause(true); });
                 renderer.domElement.addEventListener('webglcontextrestored', () => { glLostRef.current = false; setGlLost(false); });
@@ -83,7 +120,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                 const bs = new T.Mesh(new T.CircleGeometry(0.28, 12), blob); bs.rotation.x = -Math.PI / 2; bs.position.y = 0.012; scene.add(bs);
                 if (DBG && SKIPRIG) rigs.forEach(r => { r.holder.visible = false; });
                 if (DBG && NOSHADOW) { shadows.forEach(s => { s.visible = false; }); bs.visible = false; }
-                const cam = new T.PerspectiveCamera(52, CW / CH, 0.5, 200); let cx = W / 2, cz = L - 4;
+                const cam = new T.PerspectiveCamera(52, szRef.current.w / szRef.current.h, 0.5, 200); camRef.current = cam; let cx = W / 2, cz = L - 4;
                 // 화면 밖 선수는 그리지 않는다(그리지 않아도 보이는 결과가 같다 — 절두체 밖이므로). 가장자리 튐을 막기 위해 반경 2.5m 여유를 둔다
                 const frustum = new T.Frustum(); const frM = new T.Matrix4(); const frV = new T.Vector3(); const frS = new T.Sphere(frV, 2.5);
                 setMsg('');
@@ -95,7 +132,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const I = inp.current; const k = I.keys;
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
-                    const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
+                    const inputObj: Input = delRef.current ? policy(m, pol.current, FASTN > 1 ? 1 / 60 : dt) : { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
                     const __p: any = DBG ? ((window as any).__perf = (window as any).__perf || { n: 0, step: 0, rigs: 0, render: 0, hud: 0 }) : null;
                     let __m0 = DBG ? performance.now() : 0;
                     if (!paused.current && !glLostRef.current) { if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
@@ -114,7 +151,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     // 종료 문구는 관측 사실만 쓴다: 실제 패스 이벤트(비행 중 또는 시도 창 안 완료)는 패스, 소유자 불변은 빗나감, 느린 무소유는 루즈볼. 인과가 불명한 나머지(슛 진행·다른 선수 탈취 등)는 오표시를 피해 표시하지 않는다
                     tAtts.current = tAtts.current.filter(a => { const p = m.players[a.pid]; const pv = prevMap[a.pid] ?? 0; if (p.lunge <= 0 && pv > 0) { if (a.ow >= 0 && m.rec.tackles === a.tk) { const nowOw = m.ball.owner ? m.ball.owner.id : -1; const passedByCarrier = (m.pendingPass && m.pendingPass.from && m.pendingPass.from.id === a.ow) || (lastPass.current.fromId === a.ow && lastPass.current.gt >= a.gt0 - 0.15); if (passedByCarrier) flash('상대가 먼저 패스했다'); else if (nowOw === a.ow) flash('태클이 빗나갔다'); else if (nowOw === -1 && Math.hypot(m.ball.vx, m.ball.vz) < 6) flash('공이 루즈볼이 됐다'); } return false; } return true; });
                     m.players.forEach(p => { prevMap[p.id] = p.lunge; });
-                    if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk + ':' + a.ow); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, chg: Math.round(m.charge * 100) / 100 }; }
+                    if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk + ':' + a.ow); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, dg: delRef.current ? 1 : 0, chg: Math.round(m.charge * 100) / 100 }; }
                     { // GK 선방 동작 트리거(표시 전용, 판정 무변경): 캐치=공 소유가 GK로 바뀐 순간, 튕겨냄=엔진이 튕겨낼 때 GK에 거는 noPick 상승
                         const ow = m.ball.owner ? m.ball.owner.id : -1;
                         const bSp = Math.hypot(m.ball.vx, m.ball.vz);
@@ -152,9 +189,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     if (DBG) { const t = performance.now(); __p.rigs += t - __m0; __m0 = t; }
                     renderer.render(scene, cam);
                     if (DBG) { const t = performance.now(); __p.render += t - __m0; __m0 = t; }
-                    if (!(DBG && NOHUD)) drawHud(g, m, stick.current, I);
+                    if (!(DBG && NOHUD)) drawHud(g, m, stick.current, I, szRef.current);
                     if (DBG) { __p.hud += performance.now() - __m0; __p.n++; }
-                    if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec, sdg: { n: m.rec.sdg?.n ?? 0, w: m.rec.sdg?.w ?? 0, r: m.rec.sdg?.r ?? 0, c: shotCancel.current } }, rating: rating(m) }); return; } }
+                    if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec, sdg: { n: m.rec.sdg?.n ?? 0, w: m.rec.sdg?.w ?? 0, r: m.rec.sdg?.r ?? 0, c: shotCancel.current } }, rating: rating(m), delegated: delUsed.current }); return; } }
                     raf = requestAnimationFrame(frame);
                     } catch (e) { if (!frameErr) { frameErr = true; console.error('[frame]', e); setFatalErr(true); } }
                 };
@@ -165,15 +202,17 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const pt = (e: React.PointerEvent) => { const r = hud.current!.getBoundingClientRect(); return { x: (e.clientX - r.left) * CW / r.width, y: (e.clientY - r.top) * CH / r.height }; };
-    const onDown = (e: React.PointerEvent) => { const p = pt(e); if (p.x > CW * 0.62 && p.y > CH * 0.6) return; if (stick.current) return; (e.target as Element).setPointerCapture(e.pointerId); stick.current = { id: e.pointerId, ox: p.x, oy: p.y }; };
+    const pt = (e: React.PointerEvent) => { const c = hud.current!; const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height }; };
+    const onDown = (e: React.PointerEvent) => { const p = pt(e); const c = hud.current!; if (p.x > c.width * 0.62 && p.y > c.height * 0.6) return; if (stick.current) return; (e.target as Element).setPointerCapture(e.pointerId); stick.current = { id: e.pointerId, ox: p.x, oy: p.y }; };
     const onMove = (e: React.PointerEvent) => { const s = stick.current; if (!s || s.id !== e.pointerId) return; const p = pt(e); let dx = (p.x - s.ox) / 38, dy = (p.y - s.oy) / 38; const n = Math.hypot(dx, dy); if (n > 1) { dx /= n; dy /= n; } if (n < 0.12) { dx = 0; dy = 0; } inp.current.mx = dx; inp.current.mz = dy; };
     const onUp = (e: React.PointerEvent) => { const s = stick.current; if (!s || s.id !== e.pointerId) return; stick.current = null; inp.current.mx = 0; inp.current.mz = 0; };
     const btn = (extra: React.CSSProperties): React.CSSProperties => ({ position: 'absolute', borderRadius: '50%', border: '2px solid rgba(255,255,255,.85)', color: '#fff', fontWeight: 700, fontSize: 15, touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', ...(ps ? { pointerEvents: 'none', opacity: 0.3 } : {}), ...extra });
     const fill: React.CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', borderRadius: 12, touchAction: 'none' };
-    return <div className="rs-wrap" onContextMenu={e => e.preventDefault()} style={{ position: 'relative', width: '100%', maxWidth: 420, margin: '0 auto', aspectRatio: `${CW} / ${CH}`, touchAction: 'none', userSelect: 'none', WebkitTouchCallout: 'none', background: '#2a6a33', borderRadius: 12 }}>
-        <canvas ref={gl} width={CW} height={CH} style={fill} />
-        <canvas ref={hud} width={CW} height={CH} style={fill} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+    return <div className="rs-wrap" onContextMenu={e => e.preventDefault()} style={{ position: 'relative', width: sz.w, maxWidth: '100%', margin: '0 auto', aspectRatio: `${sz.w} / ${sz.h}`, touchAction: 'none', userSelect: 'none', WebkitTouchCallout: 'none', background: '#2a6a33', borderRadius: 12 }}>
+        <canvas ref={gl} width={sz.w} height={sz.h} style={fill} />
+        <canvas ref={hud} width={sz.w} height={sz.h} style={fill} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+        {!ps && !msg && <button type="button" aria-label={delegated ? '수동으로 되돌리기' : '자동 플레이로 위임'} onClick={() => setDelegation(!delegated)} style={btn({ left: '3%', bottom: '4%', width: 'min(15%, 84px)', aspectRatio: '1', background: delegated ? 'rgba(30,140,90,.85)' : 'rgba(60,60,60,.7)', fontSize: 12 })}>{delegated ? '수동' : '자동'}</button>}
+        {delegated && !ps && !msg && <div style={{ position: 'absolute', left: '3%', top: '9%', padding: '4px 10px', borderRadius: 14, background: 'rgba(30,140,90,.85)', color: '#fff', fontSize: 12, fontWeight: 700, pointerEvents: 'none' }}>자동 플레이 중</div>}
         {!ps && !msg && <button type="button" aria-label="일시정지" onClick={() => setPause(true)} style={{ position: 'absolute', right: '2%', top: '9%', padding: '4px 10px', borderRadius: 14, border: '1px solid rgba(255,255,255,.7)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: 13 }}>일시정지</button>}
         {ps && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 5, borderRadius: 12, background: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
             <div style={{ fontWeight: 800, fontSize: 22 }}>일시정지</div>
@@ -192,24 +231,25 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
             {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16 }}>경기 나가기</button>}
         </div>}
         {hint && !msg && !ps && <div style={{ position: 'absolute', left: 0, right: 0, bottom: '42%', textAlign: 'center', pointerEvents: 'none', zIndex: 4 }}><span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 16, background: 'rgba(0,0,0,.65)', color: '#ffd23d', fontWeight: 700, fontSize: 14, maxWidth: '86%' }}>{hint}</span></div>}
-        <button type="button" ref={passBtn} aria-label="패스 또는 태클" style={btn({ right: '22%', bottom: '4%', width: '17%', aspectRatio: '1', background: 'rgba(40,110,200,.75)' })}
+        <button type="button" ref={passBtn} aria-label="패스 또는 태클" style={btn({ right: '22%', bottom: '4%', width: 'min(17%, 96px)', aspectRatio: '1', background: 'rgba(40,110,200,.75)' })}
             onPointerDown={e => { e.preventDefault(); inp.current.passPressed = true; }}>패스</button>
-        <button type="button" ref={shootBtn} aria-label="슛, 누르고 있으면 힘이 찹니다" style={btn({ right: '3%', bottom: '8%', width: '20%', aspectRatio: '1', background: 'rgba(210,60,50,.8)' })}
+        <button type="button" ref={shootBtn} aria-label="슛, 누르고 있으면 힘이 찹니다" style={btn({ right: '3%', bottom: '8%', width: 'min(20%, 112px)', aspectRatio: '1', background: 'rgba(210,60,50,.8)' })}
             onPointerDown={e => { e.preventDefault(); (e.target as Element).setPointerCapture(e.pointerId); inp.current.shootDown = true; }}
             onPointerUp={() => { inp.current.shootDown = false; inp.current.shootReleased = true; }} onPointerCancel={() => { inp.current.shootDown = false; shotCancel.current++; flash('슛이 취소됐다'); }}>슛</button>
-        {teamControl && <button type="button" aria-label="선수 전환" style={btn({ right: '3%', bottom: '28%', width: '15%', aspectRatio: '1', background: 'rgba(60,60,60,.7)', fontSize: 13 })}
+        {teamControl && <button type="button" aria-label="선수 전환" style={btn({ right: '3%', bottom: '28%', width: 'min(15%, 84px)', aspectRatio: '1', background: 'rgba(60,60,60,.7)', fontSize: 13 })}
             onPointerDown={e => { e.preventDefault(); inp.current.switchPressed = true; }}>전환</button>}
     </div>;
 }
 
-function drawHud(g: CanvasRenderingContext2D, m: Match, st: { ox: number; oy: number } | null, I: { mx: number; mz: number }) {
-    g.clearRect(0, 0, CW, CH);
-    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, CW, 24);
-    g.fillStyle = '#fff'; g.font = '700 15px RSHud, sans-serif'; g.textAlign = 'center';
+function drawHud(g: CanvasRenderingContext2D, m: Match, st: { ox: number; oy: number } | null, I: { mx: number; mz: number }, sz: { w: number; h: number }) {
+    const u = sz.h / CH; // 세로 기준 배율: 와이드·대형 화면에서도 HUD 크기 비례 유지
+    g.clearRect(0, 0, sz.w, sz.h);
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, sz.w, 24 * u);
+    g.fillStyle = '#fff'; g.font = `700 ${Math.round(15 * u)}px RSHud, sans-serif`; g.textAlign = 'center';
     const tt = Math.min(m.t - (m.half - 1) * m.halfLen, m.halfLen); const mm = Math.floor(tt / 60), ss = Math.floor(tt % 60);
-    g.fillText(`내 팀 ${m.score[0]} : ${m.score[1]} 상대    ${m.half === 1 ? '전반' : '후반'} ${mm}:${String(ss).padStart(2, '0')}`, CW / 2, 17);
-    if (m.charge > 0) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(CW / 2 - 40, CH - 28, 80, 10); g.fillStyle = m.charge > 0.8 ? '#ff6b3d' : '#ffd23d'; g.fillRect(CW / 2 - 39, CH - 27, 78 * m.charge, 8); }
-    if (m.banner && m.state !== 'play') { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, CH / 2 - 34, CW, 58); g.fillStyle = '#fff'; g.font = '800 34px RSHud, sans-serif'; g.fillText(m.banner, CW / 2, CH / 2 + 8); }
-    if (st) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 3; g.beginPath(); g.arc(st.ox, st.oy, 38, 0, Math.PI * 2); g.stroke(); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(st.ox + I.mx * 38, st.oy + I.mz * 38, 16, 0, Math.PI * 2); g.fill(); }
+    g.fillText(`내 팀 ${m.score[0]} : ${m.score[1]} 상대    ${m.half === 1 ? '전반' : '후반'} ${mm}:${String(ss).padStart(2, '0')}`, sz.w / 2, 17 * u);
+    if (m.charge > 0) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(sz.w / 2 - 40 * u, sz.h - 28 * u, 80 * u, 10 * u); g.fillStyle = m.charge > 0.8 ? '#ff6b3d' : '#ffd23d'; g.fillRect(sz.w / 2 - 39 * u, sz.h - 27 * u, 78 * u * m.charge, 8 * u); }
+    if (m.banner && m.state !== 'play') { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, sz.h / 2 - 34 * u, sz.w, 58 * u); g.fillStyle = '#fff'; g.font = `800 ${Math.round(34 * u)}px RSHud, sans-serif`; g.fillText(m.banner, sz.w / 2, sz.h / 2 + 8 * u); }
+    if (st) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 3; g.beginPath(); g.arc(st.ox, st.oy, 38 * u, 0, Math.PI * 2); g.stroke(); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(st.ox + I.mx * 38 * u, st.oy + I.mz * 38 * u, 16 * u, 0, Math.PI * 2); g.fill(); }
     g.textAlign = 'left';
 }

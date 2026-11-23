@@ -15,7 +15,7 @@ const SK: { key: keyof Stats; name: string }[] = [{ key: 'shoot', name: '슛' },
 const MATCHES_PER_SEASON = 2, SEASONS = 3, HALF = 70;
 interface Team { id: number; n: string; str: number; p: number; w: number; d: number; l: number; gf: number; ga: number }
 interface League { round: number; teams: Team[]; fixtures: number[][][]; log: { rating: number; goals: number; assists: number; played: boolean; sc?: [number, number]; vs?: string }[]; lastMsg: string }
-interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proSeason?: number; sg?: number; sa?: number; sgn?: number; sdg?: { f: number; n: number; w: number; r: number; c: number }; /* 슛 진단 누적: 발사 f, 무소유 릴리스 n, 충전 중 소유 상실 후 릴리스 w, 방출 시점 소유 상실 r, 취소 c (원인 미확정 슛0 조사용 최소 자료) */ yhist?: { n: number; avg: number; ok: boolean; g?: number; a?: number }[]; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
+interface Save { v: 1; grow?: { n: number; rk: number; from: Stats; to: Stats }; tr?: string; look?: number; phase: 'new' | 'home' | 'result' | 'eval' | 'pro' | 'league' | 'leagueEnd'; league: League | null; name: string; pos: Pos; stats: Stats; season: number; game: number; trust: number; ratings: number[]; trained: boolean; last: null | { score: [number, number]; rating: number; goals: number; assists: number; passOk: number; passAtt: number; shots: number; tackles: number; trustD: number; grew: string; gb?: boolean; dg?: boolean }; evalRes: null | { ability: number; perf: number; trust: number; total: number; need: number; early: boolean; ok: boolean; missing: string }; attempts: number; legacy: number; proSeason?: number; sg?: number; sa?: number; sgn?: number; sdg?: { f: number; n: number; w: number; r: number; c: number }; dg?: number; /* 자동 플레이(위임) 사용 경기 수 — 기록 합산은 유지하고 사용 사실만 표시 */ /* 슛 진단 누적: 발사 f, 무소유 릴리스 n, 충전 중 소유 상실 후 릴리스 w, 방출 시점 소유 상실 r, 취소 c (원인 미확정 슛0 조사용 최소 자료) */ yhist?: { n: number; avg: number; ok: boolean; g?: number; a?: number }[]; hist?: { n: number; rk: number; pts: number; g: number; a: number }[] }
 const initial: Save = { v: 1, phase: 'new', name: '내 선수', pos: 'FW', stats: POS[0].base, season: 1, game: 0, trust: 30, ratings: [], trained: false, last: null, evalRes: null, attempts: 1, legacy: 0, league: null };
 const TEAM_NAMES = ['우리 구단', '한강 FC', '파도 FC', '북악 FC', '남해 FC', '새벽 FC', '청룡 FC', '은하 FC'];
 const poisson = (lam: number) => { const l = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return k - 1; };
@@ -121,11 +121,11 @@ export function App() {
         setPlaying(null);
         const ct = (v: any) => (typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : 0); const rs = r.rec.sdg;
         const sdg = { f: ct(s.sdg?.f) + ct(r.rec.shots), n: ct(s.sdg?.n) + ct(rs?.n), w: ct(s.sdg?.w) + ct(rs?.w), r: ct(s.sdg?.r) + ct(rs?.r), c: ct(s.sdg?.c) + ct(rs?.c) };
-        if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league', sdg }); return; }
+        if (playing?.kind === 'pro') { const lg = applyRound(s.league!, r.score, { rating: r.rating, goals: r.rec.goals, assists: r.rec.assists }); set({ league: lg, phase: lg.round >= 14 ? 'leagueEnd' : 'league', sdg, dg: (s.dg ?? 0) + (r.delegated ? 1 : 0) }); return; }
         const trustD = trustDelta(r.rating); const stats = { ...s.stats }; let grew = '';
         const bump = (k: keyof Stats) => { stats[k] = clamp(stats[k] + 1, 0, 99); grew = grew ? grew + ', ' + SK.find(x => x.key === k)!.name : SK.find(x => x.key === k)!.name; };
         if (r.rec.goals + r.rec.shots >= 2) bump('shoot'); if (r.rec.passOk >= 3) bump('pass'); if (r.rec.tackles >= 1) bump('defense'); let gb = false; if (!grew) { bump(POS.find(p => p.id === s.pos)!.key[0]); gb = true; }
-        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], sg: (s.sg ?? 0) + r.rec.goals, sa: (s.sa ?? 0) + r.rec.assists, sgn: (s.sgn ?? 0) + 1, sdg, last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb } });
+        set({ phase: 'result', stats, trust: clamp(s.trust + trustD, 0, 100), ratings: [...s.ratings, r.rating], sg: (s.sg ?? 0) + r.rec.goals, sa: (s.sa ?? 0) + r.rec.assists, sgn: (s.sgn ?? 0) + 1, sdg, dg: (s.dg ?? 0) + (r.delegated ? 1 : 0), last: { score: r.score, rating: r.rating, goals: r.rec.goals, assists: r.rec.assists, passOk: r.rec.passOk, passAtt: r.rec.passAtt, shots: r.rec.shots, tackles: r.rec.tackles, trustD, grew, gb, dg: r.delegated || undefined } });
     };
     const afterResult = () => {
         if (s.game + 1 >= MATCHES_PER_SEASON) {
@@ -172,6 +172,7 @@ export function App() {
                         <div className="rs-tile"><b>{s.attempts}</b><small>유스 도전 (계승 +{s.legacy})</small></div>
                     </div>
                     {unrec && <p className="rs-hint">골·도움 합계는 기록이 남은 경기 기준이다. 일부 이전 시즌은 기록이 없다.</p>}
+                    {(s.dg ?? 0) > 0 && <p className="rs-hint">통산 기록 중 {s.dg}경기는 자동 플레이를 사용한 경기다.</p>}
                     {y.length === 0 && h.length === 0 && <p className="rs-hint">아직 끝난 시즌이 없다. 시즌이 끝날 때마다 기록이 쌓인다.</p>}
                     {y.length > 0 && <>
                         <p className="rs-hint rs-mid">유스 시즌</p>
@@ -224,6 +225,7 @@ export function App() {
                 {([['평점', s.last.rating.toFixed(1)], ['골', String(s.last.goals)], ['도움', String(s.last.assists)], ['슛', String(s.last.shots)], ['패스', `${s.last.passOk}/${s.last.passAtt}`], ['태클', String(s.last.tackles)]] as [string, string][]).map(([k, v]) => <div key={k} className="rs-tile"><b>{v}</b><small>{k}</small></div>)}
             </div>
             <div className="rs-grow"><strong>이번 경기 성장</strong>{s.last.grew.split(', ').map(g => <span key={g} className="rs-chip">{s.last!.gb ? '기본 성장 ' : ''}{g} +1</span>)}<span className="rs-chip rs-chip-trust">감독 신뢰 {s.last.trustD >= 0 ? '+' : ''}{s.last.trustD}</span></div>
+            {s.last.dg && <p className="rs-hint">이 경기는 자동 플레이를 사용했다. 골·도움 등 기록은 그대로 합산된다.</p>}
             <p className="rs-hint">경기 평점에 따라 감독 신뢰가 달라진다. 실제 수치는 위에 표시된다.</p>
             <p className="rs-hint">평점은 골 +1.2, 도움 +0.8, 패스 성공 +0.1(10회까지), 유효슛 +0.2, 태클 +0.3, 패스 실패 -0.05, 이기면 +0.5·비기면 +0.2를 기본 5.5에 더해 매긴다.</p>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
