@@ -73,12 +73,29 @@ export class Rig {
             ['RightShoulder', 'RightArm', fr.thorax, fr.rsh], ['RightArm', 'RightForeArm', fr.rsh, fr.relb], ['RightForeArm', 'RightHand', fr.relb, fr.rwr]];
         for (const [b, c, a1, a2] of A) this.aim(b, c, dirOf(a1, a2));
     }
+    /** 골키퍼 선방 동작(판정과 무관한 표시 전용): side 방향으로 몸을 기울이며 팔을 뻗는다. k 진행도 0~1 */
+    savePose(x: number, z: number, h: number, side: number, k: number) {
+        const e = Math.sin(Math.min(1, Math.max(0, k)) * Math.PI); // 날았다가 복귀하는 왕복 곡선
+        this.resetRest();
+        this.holder.position.set(x, 0, z); this.holder.rotation.y = Math.PI / 2 - h;
+        this.holder.rotation.x = 0; this.holder.rotation.z = 0;
+        this.holder.updateMatrixWorld(true);
+        // 뻗는 방향(월드): 옆 + 위
+        const dirW = new T.Vector3(side, 1.1, 0).normalize().applyQuaternion(this.holder.getWorldQuaternion(new T.Quaternion()));
+        for (const s of ['Left', 'Right']) { this.aim(s + 'Arm', s + 'ForeArm', dirW); this.aim(s + 'ForeArm', s + 'Hand', dirW); }
+        // 몸통 기울임 + 약간 가라앉힘(팔 aim 이후에 적용해 팔이 공중에 남는다)
+        this.holder.rotation.z = side * 1.0 * e;
+        this.holder.position.y = -0.22 * e;
+        this.holder.updateMatrixWorld(true);
+        this.mode = 'save';
+    }
     /** x,z 위치, h 방향(rad), 달리기 속도, 킥 진행도(0~1 또는 -1) */
     update(dt: number, x: number, z: number, h: number, speed: number, kickP: number) {
+        this.holder.rotation.z = 0; this.holder.position.y = 0;
         if (kickP >= 0) {
             const fi = KF[0] + (KF[KF.length - 1] - KF[0]) * Math.min(1, kickP); this.pose(this.a.frames[Math.round(fi)]); this.model.position.y = -this.a.ground; this.mode = 'kick';
         } else {
-            if (this.mode === 'kick') { this.resetRest(); this.model.position.y = 0; this.mode = 'mix'; }
+            if (this.mode !== 'mix') { this.resetRest(); this.model.position.y = 0; this.mode = 'mix'; }
             const w = Math.min(1, speed / 2.2); this.runA.weight = w; this.idleA.weight = 1 - w; this.runA.timeScale = Math.max(0.5, speed / 4.8); this.mixer.update(dt);
         }
         this.holder.position.set(x, 0, z); this.holder.rotation.y = Math.PI / 2 - h;
