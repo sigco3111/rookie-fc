@@ -27,7 +27,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const stick = useRef<{ id: number; ox: number; oy: number } | null>(null);
     const finished = useRef(false);
     const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
-    const passBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
+    const passBtn = useRef<HTMLButtonElement>(null); const shootBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
     const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0); const prevBallY = useRef(0); const hdAnim = useRef<Record<number, { t0: number }>>({});
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
@@ -89,7 +89,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
                     if (!paused.current && !glLostRef.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
-                    const hu = m.players[m.humanId]; const want = m.ball.owner === hu ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
+                    const hu = m.players[m.humanId]; const owning = m.ball.owner === hu; const want = owning ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
+                    // 발사 가능 상태 표시: 무소유일 때 슛 버튼을 흐리게(조작 자체는 유지, 떼면 기존 안내 문구가 뜬다)
+                    if (shootBtn.current) { const op = owning ? '1' : '0.4'; if (shootBtn.current.style.opacity !== op) shootBtn.current.style.opacity = op; }
                     if (m.rec.tackles > prevTk.current) { prevTk.current = m.rec.tackles; flash('태클로 공을 빼앗았다'); } // 태클 성공 피드백(엔진은 성공 시 rec.tackles만 증가)
                     // 태클 시도 추적: 시작은 조작 선수의 런지 상승 에지, 종료는 시도별 선수 자신의 하강 에지(선수별 직전값 맵). 전환/연속 시도가 겹쳐도 시도 단위로 독립 판정
                     const prevMap = lgPrev.current;
@@ -122,6 +124,8 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                         shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
                     ring.position.x = hu.x; ring.position.z = hu.z; arrow.position.set(hu.x, 2.5 + Math.sin(now / 200) * 0.1, hu.z);
+                    // 충전량 표시: 내 선수 화살표가 차오를수록 커지고 노랑→주황→빨강(하단 충전 막대와 같은 색 체계)
+                    const chg = m.charge; arrow.scale.setScalar(1 + chg * 0.6); (arrow.material as T.MeshBasicMaterial).color.setHex(chg <= 0 ? 0xffe14d : chg < 0.8 ? 0xffb02d : 0xff6b3d);
                     const b = m.ball; ball.position.set(b.x, 0.22 + b.y, b.z); bs.position.x = b.x; bs.position.z = b.z; ball.rotation.x += b.vz * dt * 3; ball.rotation.z -= b.vx * dt * 3;
                     // 카메라: 공과 내 선수 사이를 따라간다
                     const fx = (b.x + hu.x) / 2, fz = (b.z * 0.6 + hu.z * 0.4); cx += (fx - cx) * Math.min(1, dt * 3); cz += (fz - cz) * Math.min(1, dt * 3);
@@ -165,7 +169,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         {hint && !msg && !ps && <div style={{ position: 'absolute', left: 0, right: 0, bottom: '42%', textAlign: 'center', pointerEvents: 'none', zIndex: 4 }}><span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 16, background: 'rgba(0,0,0,.65)', color: '#ffd23d', fontWeight: 700, fontSize: 14, maxWidth: '86%' }}>{hint}</span></div>}
         <button type="button" ref={passBtn} aria-label="패스 또는 태클" style={btn({ right: '22%', bottom: '4%', width: '17%', aspectRatio: '1', background: 'rgba(40,110,200,.75)' })}
             onPointerDown={e => { e.preventDefault(); inp.current.passPressed = true; }}>패스</button>
-        <button type="button" aria-label="슛, 누르고 있으면 힘이 찹니다" style={btn({ right: '3%', bottom: '8%', width: '20%', aspectRatio: '1', background: 'rgba(210,60,50,.8)' })}
+        <button type="button" ref={shootBtn} aria-label="슛, 누르고 있으면 힘이 찹니다" style={btn({ right: '3%', bottom: '8%', width: '20%', aspectRatio: '1', background: 'rgba(210,60,50,.8)' })}
             onPointerDown={e => { e.preventDefault(); (e.target as Element).setPointerCapture(e.pointerId); inp.current.shootDown = true; }}
             onPointerUp={() => { inp.current.shootDown = false; inp.current.shootReleased = true; }} onPointerCancel={() => { inp.current.shootDown = false; shotCancel.current++; flash('슛이 취소됐다'); }}>슛</button>
         {teamControl && <button type="button" aria-label="선수 전환" style={btn({ right: '3%', bottom: '28%', width: '15%', aspectRatio: '1', background: 'rgba(60,60,60,.7)', fontSize: 13 })}
