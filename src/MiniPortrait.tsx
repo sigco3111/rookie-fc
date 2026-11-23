@@ -101,7 +101,9 @@ export function MiniPortrait({ look, size = 160 }: { look: number; size?: number
     const ref = useRef<HTMLCanvasElement>(null); const [err, setErr] = useState('');
     useEffect(() => {
         let dead = false, raf = 0; const cv = ref.current!;
-        const r = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); r.setSize(size, size * 1.25, false);
+        let r: any;
+        try { r = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e: any) { setErr(String(e && e.message || e)); return; } // WebGL 불가 기기에서는 빈칸 대신 안내 문구를 보여 준다
+        r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); r.setSize(size, size * 1.25, false);
         const sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0x998877, 2.2)); const dl = new T.DirectionalLight(0xffffff, 1.4); dl.position.set(2, 4, 3); sc.add(dl);
         const cam = new T.PerspectiveCamera(30, 1 / 1.25, 0.1, 50);
         load().then(({ models, tex, base }) => {
