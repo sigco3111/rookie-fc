@@ -160,7 +160,10 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
             <button type="button" disabled={glLost} onClick={() => { if (!glLostRef.current) setPause(false); }} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16, ...(glLost ? { opacity: 0.45, cursor: 'default' } : {}) }}>{glLost ? '복구 대기 중' : '계속하기'}</button>
             {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '8px 20px', borderRadius: 22, border: '1px solid rgba(255,255,255,.7)', background: 'transparent', color: '#fff', fontSize: 14 }}>경기 나가기</button>}
         </div>}
-        {msg && <div style={{ position: 'absolute', left: 0, right: 0, top: '45%', textAlign: 'center', color: '#fff', fontWeight: 700, padding: 12 }}>{msg}</div>}
+        {msg && <div style={{ position: 'absolute', left: 0, right: 0, top: '45%', textAlign: 'center', color: '#fff', fontWeight: 700, padding: 12 }}>
+            <div>{msg}</div>
+            {msg !== '3D 모델 불러오는 중' && onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ marginTop: 12, padding: '8px 20px', borderRadius: 22, border: '1px solid rgba(255,255,255,.7)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: 14 }}>경기 나가기</button>}
+        </div>}
         {glLost && !fatalErr && <div style={{ position: 'absolute', left: '6%', right: '6%', top: '12%', textAlign: 'center', pointerEvents: 'none', zIndex: 6 }}><span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 16, background: 'rgba(0,0,0,.78)', color: '#fff', fontWeight: 700, fontSize: 14 }}>그래픽 연결이 끊겨 복구를 시도하고 있습니다</span></div>}
         {fatalErr && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 7, borderRadius: 12, background: 'rgba(0,0,0,.78)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
             <div style={{ fontWeight: 800, fontSize: 20 }}>화면 표시에 문제가 생겼습니다</div>
