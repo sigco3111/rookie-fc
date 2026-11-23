@@ -248,7 +248,7 @@ export function App() {
         <details className="rs-info"><summary>이 버전의 한계와 출처</summary><Group label="이 버전의 한계" heading>
             <Facts items={[
                 { label: '모델과 동작', value: '실제 3D. Kenney 3번 캐릭터 모델, 달리기와 대기는 Kenney 동작, 킥은 CMU 모션캡처를 3번 뼈대에 옮겨 입힌 것. 육성 화면의 선수는 Kenney 4번(Mini Characters, CC0)' },
-                { label: '없는 것', value: '반칙, 오프사이드, 헤딩, 프리킥, 이적과 재정, 실제 물리 충돌. 공은 단순 계산이다' },
+                { label: '없는 것', value: '반칙, 오프사이드, 프리킥, 이적과 재정, 실제 물리 충돌. 공은 단순 계산이다. 헤딩 판정이나 조작은 없고, 높은 공을 받을 때 머리 동작만 보여준다' },
                 { label: '미확인', value: '여러 기종 휴대폰 성능, 장시간 플레이 밸런스' },
             ]} />
         </Group></details>
