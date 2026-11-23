@@ -28,7 +28,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const finished = useRef(false);
     const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
     const passBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
-    const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0);
+    const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0); const prevBallY = useRef(0); const hdAnim = useRef<Record<number, { t0: number }>>({});
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
     const hintSeq = useRef(0);
@@ -107,12 +107,17 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                             // 캐치: 빠른 공(≥8)의 소유가 GK로 바뀐 순간. 튕겨냄: noPick 상승 + 공이 위로 튐(vy>0.8) — 킥의 noPick 0.4와 구분
                             if (!gkAnim.current[p.id] && ((ow === p.id && prevBallOw.current !== p.id && p.noPick <= 0 && prevBallSp.current >= 8) || (p.noPick > np + 0.01 && m.ball.vy > 0.8))) gkAnim.current[p.id] = { side: m.ball.x >= p.x ? 1 : -1, t0: now };
                             prevGkNp.current[p.id] = p.noPick; });
+                        // 헤더(표시 전용, 판정 무변경): 공중의 공(직전 무소유 프레임 y≥0.5)을 필드 선수가 받은 순간
+                        if (ow >= 0 && ow !== prevBallOw.current && prevBallY.current >= 0.5) { const rp = m.players[ow]; if (rp.role !== 'GK' && !hdAnim.current[ow]) hdAnim.current[ow] = { t0: now }; }
                         prevBallOw.current = ow; prevBallSp.current = bSp;
+                        if (!m.ball.owner) prevBallY.current = m.ball.y;
                     }
                     m.players.forEach((p, i) => {
-                        const sp = Math.hypot(p.vx, p.vz); const ga = p.role === 'GK' ? gkAnim.current[p.id] : undefined;
+                        const sp = Math.hypot(p.vx, p.vz); const ga = p.role === 'GK' ? gkAnim.current[p.id] : undefined; const ha = hdAnim.current[p.id];
                         if (ga && !p.kick) { if (now - ga.t0 < 700) rigs[i].savePose(p.x, p.z, p.h, ga.side, (now - ga.t0) / 700); else { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
                         else if (ga) { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); }
+                        else if (ha && !p.kick) { if (now - ha.t0 < 500) rigs[i].headPose(p.x, p.z, p.h, (now - ha.t0) / 500); else { delete hdAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
+                        else if (ha) { delete hdAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); }
                         else { rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; }
                         shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
