@@ -7,6 +7,8 @@ const CW = 390, CH = 590;
 declare const __TEST_HOOKS__: boolean;
 const DBG = typeof __TEST_HOOKS__ !== 'undefined' && __TEST_HOOKS__ && typeof location !== 'undefined' && new URLSearchParams(location.search).has('dbg');
 const FASTN = DBG ? Math.max(1, Math.min(90, parseInt(new URLSearchParams(location.search).get('fast') || '1', 10) || 1)) : 1;
+const DIAG = DBG ? new URLSearchParams(location.search).get('diag') || '' : '';
+const SKIPRIG = DIAG.includes('norigs'), NOSHADOW = DIAG.includes('noshadow'), NOHUD = DIAG.includes('nohud');
 export interface Result { score: [number, number]; rec: Rec; rating: number }
 
 function pitchTexture() {
@@ -78,7 +80,11 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                 const arrow = new T.Mesh(new T.ConeGeometry(0.28, 0.5, 4), new T.MeshBasicMaterial({ color: 0xffe14d })); arrow.rotation.x = Math.PI; scene.add(arrow);
                 const ball = new T.Mesh(new T.SphereGeometry(0.22, 18, 14), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 })); scene.add(ball);
                 const bs = new T.Mesh(new T.CircleGeometry(0.28, 12), blob); bs.rotation.x = -Math.PI / 2; bs.position.y = 0.012; scene.add(bs);
+                if (SKIPRIG) rigs.forEach(r => { r.holder.visible = false; });
+                if (NOSHADOW) { shadows.forEach(s => { s.visible = false; }); bs.visible = false; }
                 const cam = new T.PerspectiveCamera(52, CW / CH, 0.5, 200); let cx = W / 2, cz = L - 4;
+                // 화면 밖 선수는 그리지 않는다(그리지 않아도 보이는 결과가 같다 — 절두체 밖이므로). 가장자리 튐을 막기 위해 반경 2.5m 여유를 둔다
+                const frustum = new T.Frustum(); const frM = new T.Matrix4(); const frV = new T.Vector3(); const frS = new T.Sphere(frV, 2.5);
                 setMsg('');
                 let last = performance.now(), endT = 0;
                 let frameErr = false;
@@ -89,7 +95,10 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
+                    const __p: any = DBG ? ((window as any).__perf = (window as any).__perf || { n: 0, step: 0, rigs: 0, render: 0, hud: 0 }) : null;
+                    let __m0 = DBG ? performance.now() : 0;
                     if (!paused.current && !glLostRef.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (DBG) { const t = performance.now(); __p.step += t - __m0; __m0 = t; }
                     const hu = m.players[m.humanId]; const owning = m.ball.owner === hu; const want = owning ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
                     // 발사 가능 상태 표시: 무소유일 때 슛 버튼을 흐리게(조작 자체는 유지, 떼면 기존 안내 문구가 뜬다)
                     if (shootBtn.current) { const op = owning ? '1' : '0.4'; if (shootBtn.current.style.opacity !== op) shootBtn.current.style.opacity = op; }
@@ -115,7 +124,12 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                         prevBallOw.current = ow; prevBallSp.current = bSp;
                         if (!m.ball.owner) prevBallY.current = m.ball.y;
                     }
-                    m.players.forEach((p, i) => {
+                    cam.updateMatrixWorld(); frustum.setFromProjectionMatrix(frM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+                    m.players.forEach((p, i) => { if (SKIPRIG) { shadows[i].position.x = p.x; shadows[i].position.z = p.z; return; }
+                        const vis = frustum.intersectsSphere(frS.set(frV.set(p.x, 1, p.z), 2.5));
+                        if (rigs[i].holder.visible !== vis) rigs[i].holder.visible = vis;
+                        if (shadows[i].visible !== vis) shadows[i].visible = vis;
+                        if (!vis) return;
                         const sp = Math.hypot(p.vx, p.vz); const ga = p.role === 'GK' ? gkAnim.current[p.id] : undefined; const ha = hdAnim.current[p.id];
                         if (ga && !p.kick) { if (now - ga.t0 < 700) rigs[i].savePose(p.x, p.z, p.h, ga.side, (now - ga.t0) / 700); else { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
                         else if (ga) { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); }
@@ -131,8 +145,11 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     // 카메라: 공과 내 선수 사이를 따라간다
                     const fx = (b.x + hu.x) / 2, fz = (b.z * 0.6 + hu.z * 0.4); cx += (fx - cx) * Math.min(1, dt * 3); cz += (fz - cz) * Math.min(1, dt * 3);
                     const ccx = W / 2 + (cx - W / 2) * 0.8; cam.position.set(ccx, 17, Math.min(cz + 14, L + 19)); const lk = 17 + 6 * Math.min(1, Math.max(0, (L - cz - 8) / 20)); cam.lookAt(ccx, 0, Math.min(cz + 14, L + 19) - lk);
+                    if (DBG) { const t = performance.now(); __p.rigs += t - __m0; __m0 = t; }
                     renderer.render(scene, cam);
-                    drawHud(g, m, stick.current, I);
+                    if (DBG) { const t = performance.now(); __p.render += t - __m0; __m0 = t; }
+                    if (!NOHUD) drawHud(g, m, stick.current, I);
+                    if (DBG) { __p.hud += performance.now() - __m0; __p.n++; }
                     if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec, sdg: { n: m.rec.sdg?.n ?? 0, w: m.rec.sdg?.w ?? 0, r: m.rec.sdg?.r ?? 0, c: shotCancel.current } }, rating: rating(m) }); return; } }
                     raf = requestAnimationFrame(frame);
                     } catch (e) { if (!frameErr) { frameErr = true; console.error('[frame]', e); setFatalErr(true); } }
