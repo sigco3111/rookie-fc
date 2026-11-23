@@ -26,6 +26,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const inp = useRef({ mx: 0, mz: 0, passPressed: false, shootDown: false, shootReleased: false, switchPressed: false, keys: {} as Record<string, boolean> });
     const stick = useRef<{ id: number; ox: number; oy: number } | null>(null);
     const finished = useRef(false);
+    const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number }[]>([]);
     const passBtn = useRef<HTMLButtonElement>(null);
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
@@ -41,10 +42,11 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         const g = hud.current!.getContext('2d')!;
         const kd = (e: KeyboardEvent) => {
             const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
-            if (!inp.current.keys[k]) { if (k === ' ' || k === 'j') inp.current.passPressed = true; if (k === 'q') inp.current.switchPressed = true; if (k === 'k' || k === 'l') inp.current.shootDown = true; }
+            if (k === 'p' && !e.repeat) { setPause(!paused.current); return; }
+            if (!inp.current.keys[k]) { if (k === ' ' || k === 'j') inp.current.passPressed = true; if (k === 'l' || k === 'q') inp.current.switchPressed = true; if (k === 'k') inp.current.shootDown = true; }
             inp.current.keys[k] = true;
         };
-        const ku = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); inp.current.keys[k] = false; if (k === 'k' || k === 'l') { inp.current.shootDown = false; inp.current.shootReleased = true; } };
+        const ku = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); inp.current.keys[k] = false; if (k === 'k') { inp.current.shootDown = false; inp.current.shootReleased = true; } };
         window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
         (async () => {
             try {
@@ -65,7 +67,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const back = new T.Mesh(new T.PlaneGeometry(GOAL_HALF * 2, 2.4), net); back.position.set(W / 2, 1.2, z + d * 1.8); scene.add(back);
                     const top = new T.Mesh(new T.PlaneGeometry(GOAL_HALF * 2, 1.8), net); top.rotation.x = Math.PI / 2; top.position.set(W / 2, 2.4, z + d * 0.9); scene.add(top);
                 }
-                const rigs = m.players.map(p => { const r = new Rig(A, p.role === 'GK' ? 2 : p.team); scene.add(r.holder); return r; });
+                const rigs = m.players.map(p => { const r = new Rig(A, p.role === 'GK' ? 2 : p.team); r.holder.rotation.order = 'YXZ'; scene.add(r.holder); return r; });
                 const blob = new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 });
                 const shadows = m.players.map(() => { const s = new T.Mesh(new T.CircleGeometry(0.55, 16), blob); s.rotation.x = -Math.PI / 2; s.position.y = 0.01; scene.add(s); return s; });
                 const ring = new T.Mesh(new T.RingGeometry(0.7, 0.9, 24), new T.MeshBasicMaterial({ color: 0xffe14d, side: T.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; scene.add(ring);
@@ -81,11 +83,17 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
-                    if (!paused.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, inputObj); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (!paused.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
                     const hu = m.players[m.humanId]; const want = m.ball.owner === hu ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
-                    if (DBG) { (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge }; }
+                    if (m.rec.tackles > prevTk.current) { prevTk.current = m.rec.tackles; flash('태클로 공을 빼앗았다'); } // 태클 성공 피드백(엔진은 성공 시 rec.tackles만 증가)
+                    // 태클 시도 추적: 시작은 조작 선수의 런지 상승 에지, 종료는 시도별 선수 자신의 하강 에지(선수별 직전값 맵). 전환/연속 시도가 겹쳐도 시도 단위로 독립 판정
+                    const prevMap = lgPrev.current;
+                    if (hu.lunge > 0 && (prevMap[m.humanId] ?? 0) <= 0) tAtts.current.push({ pid: m.humanId, tk: m.ball.owner && m.ball.owner.team !== hu.team ? m.rec.tackles : -1 });
+                    tAtts.current = tAtts.current.filter(a => { const p = m.players[a.pid]; const pv = prevMap[a.pid] ?? 0; if (p.lunge <= 0 && pv > 0) { if (a.tk >= 0 && m.rec.tackles === a.tk) flash('태클이 빗나갔다'); return false; } return true; });
+                    m.players.forEach(p => { prevMap[p.id] = p.lunge; });
+                    if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, chg: Math.round(m.charge * 100) / 100 }; }
                     m.players.forEach((p, i) => {
-                        const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); shadows[i].position.x = p.x; shadows[i].position.z = p.z;
+                        const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
                     ring.position.x = hu.x; ring.position.z = hu.z; arrow.position.set(hu.x, 2.5 + Math.sin(now / 200) * 0.1, hu.z);
                     const b = m.ball; ball.position.set(b.x, 0.22 + b.y, b.z); bs.position.x = b.x; bs.position.z = b.z; ball.rotation.x += b.vz * dt * 3; ball.rotation.z -= b.vx * dt * 3;
@@ -94,7 +102,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const ccx = W / 2 + (cx - W / 2) * 0.8; cam.position.set(ccx, 17, Math.min(cz + 14, L + 19)); const lk = 17 + 6 * Math.min(1, Math.max(0, (L - cz - 8) / 20)); cam.lookAt(ccx, 0, Math.min(cz + 14, L + 19) - lk);
                     renderer.render(scene, cam);
                     drawHud(g, m, stick.current, I);
-                    if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec }, rating: rating(m) }); return; } }
+                    if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec, sdg: { n: m.rec.sdg?.n ?? 0, w: m.rec.sdg?.w ?? 0, r: m.rec.sdg?.r ?? 0, c: shotCancel.current } }, rating: rating(m) }); return; } }
                     raf = requestAnimationFrame(frame);
                 };
                 raf = requestAnimationFrame(frame);
@@ -126,7 +134,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
             onPointerDown={e => { e.preventDefault(); inp.current.passPressed = true; }}>패스</button>
         <button type="button" aria-label="슛, 누르고 있으면 힘이 찹니다" style={btn({ right: '3%', bottom: '8%', width: '20%', aspectRatio: '1', background: 'rgba(210,60,50,.8)' })}
             onPointerDown={e => { e.preventDefault(); (e.target as Element).setPointerCapture(e.pointerId); inp.current.shootDown = true; }}
-            onPointerUp={() => { inp.current.shootDown = false; inp.current.shootReleased = true; }} onPointerCancel={() => { inp.current.shootDown = false; flash('슛이 취소됐다'); }}>슛</button>
+            onPointerUp={() => { inp.current.shootDown = false; inp.current.shootReleased = true; }} onPointerCancel={() => { inp.current.shootDown = false; shotCancel.current++; flash('슛이 취소됐다'); }}>슛</button>
         {teamControl && <button type="button" aria-label="선수 전환" style={btn({ right: '3%', bottom: '28%', width: '15%', aspectRatio: '1', background: 'rgba(60,60,60,.7)', fontSize: 13 })}
             onPointerDown={e => { e.preventDefault(); inp.current.switchPressed = true; }}>전환</button>}
     </div>;
