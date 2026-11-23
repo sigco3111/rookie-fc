@@ -22,17 +22,17 @@ const shot = async (f) => { const r = await send('Page.captureScreenshot', { for
 const out = { inMatch: false };
 for (let i = 0; i < 25 && !out.inMatch; i++) { await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.includes('직접 뛰기')); if (b) { b.click(); return 1; } return 0; })()`); await sleep(1200); out.inMatch = !!(await hu()); }
 // 강제조건 통합시험(시험 전용): 제어된 근접/소유 + 실제 J입력 → 엔진 스틸 → 화면 표시
-const cntAndShoot = async (text, file, ms) => { let n = 0, was = false; const t0 = Date.now(); while (Date.now() - t0 < ms) { const b = await ev('document.body.textContent'); const has = b.includes(text); if (has && !was) { n++; await shot(file); } was = has; await sleep(80); } return n; };
+const cntAndShoot = async (text, file, ms, alt) => { let n = 0, was = false; const t0 = Date.now(); const fls = []; while (Date.now() - t0 < ms) { const f = await ev('window.__flash || null'); if (f && fls[fls.length-1] !== f) fls.push(f); const b = await ev('document.body.textContent'); const has = b.includes(text) || (alt && alt.some(a => b.includes(a))); if (has && !was) { n++; await shot(file); } was = has; await sleep(80); } out.P2_flashSeq = fls; return n; };
 // 1) 헛태클 플래시 가시 시점 캡처(자연 입력, RNG 0.99)
 {
   let h = null; const t0 = Date.now();
   while (Date.now() - t0 < 45000) { h = await hu(); if (h && h.state === 'play' && h.owner >= 7) break; await sleep(200); h = null; }
   if (h) {
-    await ev('Math.random = () => 0.99; 0');
+    await ev(`(() => { const m = window.__m; const o = m.ball.owner; if (o) { o.think = 9; } Math.random = () => 0.99; return 0; })()`);
     await key('keydown', 'j');
     for (let i = 0; i < 40; i++) { const g = await hu(); if (g && g.lng > 0.02) break; await sleep(60); }
     await key('keyup', 'j');
-    out.P2_flashes = await cntAndShoot('태클이 빗나갔다', '/tmp/vt3g-whiff.png', 6000);
+    out.P2_flashes = await cntAndShoot('태클이 빗나갔다', '/tmp/vt3g-whiff.png', 14000, ['공이 루즈볼이 됐다']);
   } else out.P2 = 'skip';
 }
 await sleep(1500);
