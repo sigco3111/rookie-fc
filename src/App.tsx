@@ -103,6 +103,7 @@ export function App() {
     const [save, setSave, saved] = useLocalState<Save>('rookie-soccer.v1', initial, checkSave);
     const [playing, setPlaying] = useState<null | { oppStr: number; team: boolean; kind: 'youth' | 'pro' }>(null);
     const [key, setKey] = useState(0);
+    const [records, setRecords] = useState(false);
     if (CRASH) throw new Error('verify-crash');
     const set = (p: Partial<Save>) => { if (saved.ready) setSave({ ...save, ...p }); };
     const s = save;
@@ -154,11 +155,41 @@ export function App() {
     return <FileCard>
         <Header title="루키나인 축구" fact="유스에서 키워 1군으로. 7대7" />
         <Callout>{saved.message || '진행은 이 기기와 이 브라우저에 저장된다.'}</Callout>
+        {!playing && records && <Group label="기록실" heading>
+            {(() => {
+                const y = s.yhist ?? [], h = s.hist ?? [];
+                const yg = y.reduce((a, c) => a + (c.g ?? 0), 0), ya = y.reduce((a, c) => a + (c.a ?? 0), 0);
+                const hg = h.reduce((a, c) => a + c.g, 0), ha = h.reduce((a, c) => a + c.a, 0);
+                const inYouth = ['home', 'result', 'eval'].includes(s.phase);
+                const cg = inYouth ? (s.sg ?? 0) : 0, ca = inYouth ? (s.sa ?? 0) : 0;
+                const lg = s.league && ['league', 'leagueEnd'].includes(s.phase) ? s.league.log.reduce((a, c) => a + c.goals, 0) : 0;
+                const la = s.league && ['league', 'leagueEnd'].includes(s.phase) ? s.league.log.reduce((a, c) => a + c.assists, 0) : 0;
+                return <>
+                    <div className="rs-tiles">
+                        <div className="rs-tile"><b>{yg + hg + cg + lg}</b><small>통산 골</small></div>
+                        <div className="rs-tile"><b>{ya + ha + ca + la}</b><small>통산 도움</small></div>
+                        <div className="rs-tile"><b>{s.attempts}</b><small>유스 도전 (계승 +{s.legacy})</small></div>
+                    </div>
+                    {y.length === 0 && h.length === 0 && <p className="rs-hint">아직 끝난 시즌이 없다. 시즌이 끝날 때마다 기록이 쌓인다.</p>}
+                    {y.length > 0 && <>
+                        <p className="rs-hint rs-mid">유스 시즌</p>
+                        <table className="rs-table"><thead><tr><th>시즌</th><th>평균 평점</th><th>골</th><th>도움</th><th>결과</th></tr></thead>
+                            <tbody>{y.map(r => <tr key={r.n}><td>{r.n}시즌</td><td>{r.avg.toFixed(1)}</td><td>{r.g ?? '-'}</td><td>{r.a ?? '-'}</td><td>{r.ok ? '승격' : '미달'}</td></tr>)}</tbody></table>
+                    </>}
+                    {h.length > 0 && <>
+                        <p className="rs-hint rs-mid">1군 시즌</p>
+                        <table className="rs-table"><thead><tr><th>시즌</th><th>순위</th><th>승점</th><th>골</th><th>도움</th></tr></thead>
+                            <tbody>{h.map(r => <tr key={r.n}><td>{r.n}시즌</td><td>{r.rk}위</td><td>{r.pts}</td><td>{r.g}</td><td>{r.a}</td></tr>)}</tbody></table>
+                    </>}
+                </>;
+            })()}
+            <Btn onClick={() => setRecords(false)}>돌아가기</Btn>
+        </Group>}
         {playing && <Group label={playing.kind === 'pro' ? '1군 경기: 팀 전체 조작' : `유스 ${s.season}시즌 ${s.game + 1}경기`} heading>
             <MatchView key={key} stats={s.stats} pos={s.pos} oppStr={playing.oppStr} teamControl={playing.team} halfLen={HALF} onFinish={finish} onQuit={() => setPlaying(null)} />
             <p className="rs-hint">왼쪽 화면을 누른 채 끌어서 이동. 슛은 누르고 있으면 힘이 차고, 뗄 때 스틱을 좌우로 잡고 있으면 그쪽 골대 구석을 노린다(스틱을 안 쓰거나 뒤로 당기면 중앙 쪽). 공이 없을 때 패스 버튼은 태클이다{playing.team ? '. 전환은 가까운 선수로 바꾼다' : ''}. 키보드는 WASD·방향키 이동, J·스페이스 패스(공이 없으면 태클), K 홀드 충전 후 떼면 슛, P 일시정지{playing.team ? ', L 전환' : ''}.</p>
         </Group>}
-        {!playing && s.phase === 'new' && <Group label="선수 만들기" heading>
+        {!playing && !records && s.phase === 'new' && <Group label="선수 만들기" heading>
             <label className="rs-field">이름<input className="rs-input" value={s.name} maxLength={8} onChange={e => set({ name: e.target.value })} /></label>
             <div className="rs-center"><MiniPortrait look={s.look ?? 0} /></div>
             <div className="rs-row">{LOOKS.map((_, i) => <Btn key={i} kind={(s.look ?? 0) === i ? 'primary' : 'secondary'} onClick={() => set({ look: i })}>외형 {i + 1}</Btn>)}</div>
@@ -166,7 +197,7 @@ export function App() {
             <Bars s={s.stats} />
             <Btn onClick={() => set({ phase: 'home', trained: false })}>유스팀 입단</Btn>
         </Group>}
-        {!playing && s.phase === 'home' && <Group label={`${s.name} 유스 ${s.season}시즌 ${s.game + 1}/${MATCHES_PER_SEASON}경기`} heading>
+        {!playing && !records && s.phase === 'home' && <Group label={`${s.name} 유스 ${s.season}시즌 ${s.game + 1}/${MATCHES_PER_SEASON}경기`} heading>
             <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={88} /></div>
             <div className="rs-tiles">
                 <div className="rs-tile"><b>{s.trust}</b><small>감독 신뢰 / 100</small></div>
@@ -182,9 +213,9 @@ export function App() {
             <p className="rs-hint">경기 전 훈련 하나를 고른다. 오른쪽 숫자가 훈련 후 능력치.</p>
             <p className="rs-hint">경기에서는 슛과 골을 합해 2회 이상이면 슛, 패스 성공 3회 이상이면 패스, 태클 1회 이상이면 수비가 오른다. 어느 조건도 못 채우면 포지션 핵심 능력치가 기본으로 오르고, 드리블과 속도는 경기로는 오르지 않는다.</p>
             <div className="rs-row">{SK.map(k => <Btn key={k.key} kind="secondary" disabled={s.trained} onClick={() => train(k.key)}>{k.name} {s.stats[k.key]}{s.trained ? '' : '→' + clamp(s.stats[k.key] + (POS.find(p => p.id === s.pos)!.key.includes(k.key) ? 3 : 2), 0, 99)}</Btn>)}</div>
-            <Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn>
+            <div className="rs-row"><Btn onClick={startMatch}>{s.trained ? '경기 시작' : '훈련 없이 경기 시작'}</Btn><Btn kind="secondary" onClick={() => setRecords(true)}>기록실</Btn></div>
         </Group>}
-        {!playing && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
+        {!playing && !records && s.phase === 'result' && s.last && <Group label={`경기 결과 · ${s.last.score[0] > s.last.score[1] ? '승리' : s.last.score[0] < s.last.score[1] ? '패배' : '무승부'}`} heading>
             <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={120} /></div>
             <div className="rs-score"><span>{s.last.score[0]}</span><i>:</i><span>{s.last.score[1]}</span></div>
             <div className="rs-tiles">
@@ -195,7 +226,7 @@ export function App() {
             <p className="rs-hint">평점은 골 +1.2, 도움 +0.8, 패스 성공 +0.1(10회까지), 유효슛 +0.2, 태클 +0.3, 패스 실패 -0.05, 이기면 +0.5·비기면 +0.2를 기본 5.5에 더해 매긴다.</p>
             <Btn onClick={afterResult}>{s.game + 1 >= MATCHES_PER_SEASON ? '시즌 말 승격 평가' : '다음 경기 준비'}</Btn>
         </Group>}
-        {!playing && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
+        {!playing && !records && s.phase === 'eval' && s.evalRes && <Group label={`${s.season}시즌 말 승격 평가`} heading>
             <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={96} /></div>
             <div className="rs-score"><span>{s.evalRes.total}</span><i>/ 100</i></div>
             <p className="rs-hint rs-mid">기준 {s.evalRes.need}점 ({s.evalRes.early ? '조기 승격' : '기본 승격'}) {s.evalRes.ok ? '통과' : '미달'}</p>
@@ -207,12 +238,12 @@ export function App() {
             {!s.evalRes.ok && <div className="rs-grow"><strong>만점까지 가장 많이 남은 항목</strong><span className="rs-chip">{s.evalRes.missing}</span><small className="rs-hint">{s.evalRes.missing === '능력치' ? '훈련으로 능력치를 올린다.' : s.evalRes.missing === '경기 활약' ? '평균 평점이 오르면 상승 (8.0이면 만점).' : '경기 평점이 높을수록 감독 신뢰가 더 많이 오른다.'}</small></div>}
             <Btn onClick={afterEval}>{s.evalRes.ok ? '1군 승격' : s.season >= SEASONS ? '재도전 (계승 보상 능력치 +3, 신뢰 40 시작)' : '다음 시즌'}</Btn>
         </Group>}
-        {!playing && s.phase === 'pro' && <Group label="1군 승격" heading>
+        {!playing && !records && s.phase === 'pro' && <Group label="1군 승격" heading>
             {(s.yhist ?? []).length > 0 && <Callout>유스 기록: {s.yhist!.map(fmtY).join(' / ')}</Callout>}
             <Callout>승격 후에는 팀 전체를 조작한다. 공을 가진 선수는 직접, 나머지는 AI. 전환 버튼으로 가까운 선수로 바꾼다. 가상 구단 8팀 풀리그(14라운드)이고 직접 뛰지 않는 라운드는 자동 진행한다.</Callout>
             <Btn onClick={startLeague}>1군 리그 시작</Btn>
         </Group>}
-        {!playing && s.phase === 'league' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 리그 ${s.league.round + 1}/14라운드`} heading>
+        {!playing && !records && s.phase === 'league' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 리그 ${s.league.round + 1}/14라운드`} heading>
             {s.grow && s.league.round === 0 && <Callout>{s.grow.n}시즌 성장 ({s.grow.rk}위): {SK.map(k => `${k.name} ${s.grow!.from[k.key]}→${s.grow!.to[k.key]}`).join(', ')}</Callout>}
             {s.league.lastMsg && <Callout>지난 경기: {s.league.lastMsg}</Callout>}
             <div className="rs-tiles rs-vs">
@@ -220,11 +251,11 @@ export function App() {
                 <div className="rs-vsm">VS</div>
                 <div className="rs-tile"><b>{s.league.teams[myFixture(s.league)].str}</b><small>{s.league.teams[myFixture(s.league)].n}</small></div>
             </div>
-            <div className="rs-row"><Btn onClick={playRound}>직접 뛰기</Btn><Btn kind="secondary" onClick={autoRound}>자동 진행</Btn></div>
+            <div className="rs-row"><Btn onClick={playRound}>직접 뛰기</Btn><Btn kind="secondary" onClick={autoRound}>자동 진행</Btn><Btn kind="secondary" onClick={() => setRecords(true)}>기록실</Btn></div>
             <Table lg={s.league} />
             {s.league.log.length > 0 && <details className="rs-info"><summary>라운드 기록 ({s.league.log.length})</summary><p className="rs-hint">{s.league.log.map((e, i) => `${i + 1}R${e.vs ? ' vs ' + e.vs : ''}${e.sc ? ` ${e.sc[0]}:${e.sc[1]}` : ''}${e.played ? ` · 평점 ${e.rating.toFixed(1)} · ${e.goals}골 ${e.assists}도움` : ' · 자동'}`).join(' / ')}</p></details>}
         </Group>}
-        {!playing && s.phase === 'leagueEnd' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 종료`} heading>
+        {!playing && !records && s.phase === 'leagueEnd' && s.league && <Group label={`1군 ${s.proSeason ?? 1}시즌 종료`} heading>
             {(() => { const so = sorted(s.league.teams); const rk = so.findIndex(t => t.id === 0) + 1; const me = so[rk - 1]; return <>
                 <div className="rs-center"><MiniPortrait look={s.look ?? 0} size={96} /></div>
                 <div className="rs-score"><span>{rk}위</span><i>/ 8팀</i></div>
@@ -239,7 +270,7 @@ export function App() {
             {(() => { const rk = sorted(s.league.teams).findIndex(t => t.id === 0) + 1; const to = proGrow(s.stats, s.pos, rk); return <Callout>성장 예정: {SK.map(k => `${k.name} ${s.stats[k.key]}→${to[k.key]}`).join(', ')}</Callout>; })()}
             <p className="rs-hint">시즌이 끝나면 성장한다. 이번 순위 기준으로 {s.pos === 'FW' ? '공격수' : s.pos === 'MF' ? '미드필더' : '수비수'}의 핵심 능력치({(POS.find(p => p.id === s.pos) || POS[0]).key.map(k => SK.find(x => x.key === k)!.name).join('·')})는 +{proGain(sorted(s.league.teams).findIndex(t => t.id === 0) + 1)}, 나머지는 +1. 새 8팀 리그를 치르고 순위는 기록으로 남는다. 이적은 아직 없다.</p>
             <Table lg={s.league} />
-            <Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn>
+            <div className="rs-row"><Btn onClick={nextProSeason}>{`1군 ${(s.proSeason ?? 1) + 1}시즌 시작 (성장 적용)`}</Btn><Btn kind="secondary" onClick={() => setRecords(true)}>기록실</Btn></div>
             <Btn kind="secondary" onClick={() => { if (window.confirm('이번 리그 순위와 기록이 지워지고 새 리그가 시작된다. 계속할까?')) startLeague(); }}>리그 다시 도전 (이번 기록 초기화)</Btn>
             <Btn kind="secondary" onClick={reset}>처음부터</Btn>
             <Backup save={s} onRestore={v => { if (saved.ready) setSave(v); }} persist={saved.persist} />
