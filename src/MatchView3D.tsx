@@ -28,7 +28,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const inp = useRef({ mx: 0, mz: 0, passPressed: false, shootDown: false, shootReleased: false, switchPressed: false, keys: {} as Record<string, boolean> });
     const stick = useRef<{ id: number; ox: number; oy: number } | null>(null);
     const finished = useRef(false);
-    const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
+    const shotCancel = useRef(0); const prevTk = useRef(0); const prevSdgN = useRef(0); const prevSdgW = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
     const passBtn = useRef<HTMLButtonElement>(null); const shootBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
     const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0); const prevBallY = useRef(0); const hdAnim = useRef<Record<number, { t0: number }>>({});
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
@@ -97,7 +97,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
                     const __p: any = DBG ? ((window as any).__perf = (window as any).__perf || { n: 0, step: 0, rigs: 0, render: 0, hud: 0 }) : null;
                     let __m0 = DBG ? performance.now() : 0;
-                    if (!paused.current && !glLostRef.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (!paused.current && !glLostRef.current) { if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    // 슛 억제 피드백(표시 전용, 판정 무변경): 엔진이 분류한 릴리스 실패를 카운터 상승 에지로 감지해 안내한다
+                    { const sdn = m.rec.sdg?.n ?? 0, sdw = m.rec.sdg?.w ?? 0; if (sdw > prevSdgW.current) flash('충전한 슛이 취소됐다'); else if (sdn > prevSdgN.current) flash('공이 없어 슛이 안 나갔다'); prevSdgW.current = sdw; prevSdgN.current = sdn; }
                     if (DBG) { const t = performance.now(); __p.step += t - __m0; __m0 = t; }
                     const hu = m.players[m.humanId]; const owning = m.ball.owner === hu; const want = owning ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
                     // 발사 가능 상태 표시: 무소유일 때 슛 버튼을 흐리게(조작 자체는 유지, 떼면 기존 안내 문구가 뜬다)
