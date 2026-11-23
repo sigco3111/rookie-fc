@@ -89,6 +89,20 @@ export class Rig {
         this.holder.updateMatrixWorld(true);
         this.mode = 'save';
     }
+    /** 헤더 동작(판정과 무관한 표시 전용): 높은 공을 받은 순간 고개를 앞으로 숙였다가 복귀. k 진행도 0~1 */
+    headPose(x: number, z: number, h: number, k: number) {
+        const e = Math.sin(Math.min(1, Math.max(0, k)) * Math.PI); // 숙였다가 복귀하는 왕복 곡선
+        this.resetRest();
+        this.holder.position.set(x, 0.09 * e, z); this.holder.rotation.y = Math.PI / 2 - h;
+        this.holder.rotation.x = 0; this.holder.rotation.z = 0;
+        this.holder.updateMatrixWorld(true);
+        // 고개를 숙이는 방향(월드): 위 → 선수 전방으로
+        const fwd = new T.Vector3(Math.cos(h), 0, Math.sin(h));
+        const dirW = new T.Vector3(0, 1 - 0.85 * e, 0).add(fwd.multiplyScalar(0.85 * e)).normalize();
+        this.aim('Neck', 'Head', dirW);
+        this.holder.updateMatrixWorld(true);
+        this.mode = 'save'; // mix 복귀 시 resetRest 경로 재사용
+    }
     /** x,z 위치, h 방향(rad), 달리기 속도, 킥 진행도(0~1 또는 -1) */
     update(dt: number, x: number, z: number, h: number, speed: number, kickP: number) {
         this.holder.rotation.z = 0; this.holder.position.y = 0;
