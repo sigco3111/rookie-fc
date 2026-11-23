@@ -42,6 +42,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     useEffect(() => {
         let raf = 0, alive = true; let renderer: any = null;
         const m: Match = makeMatch(stats, pos, oppStr, teamControl, halfLen);
+        if (DBG) { (window as any).__mounts = ((window as any).__mounts || 0) + 1; }
         const g = hud.current!.getContext('2d')!;
         const kd = (e: KeyboardEvent) => {
             const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();

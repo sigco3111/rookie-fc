@@ -64,6 +64,7 @@ while (Date.now() - t1 < 90000) {
     if (hu.owner === hu.hid) {
         if (stickOn) { await tUp(1); stickOn = false; }
         const sb2 = await btnRect('슛');
+        const gt0 = await ev('window.__hu ? window.__hu.t : null');
         await tDown(2, sb2[0], sb2[1]);
         await sleep(200);
         console.log('sd@200ms=', await ev('window.__hu ? window.__hu.sd : null'), 'chg=', await ev('window.__hu ? window.__hu.chg : null'));
@@ -72,6 +73,7 @@ while (Date.now() - t1 < 90000) {
         await shot('/tmp/ui-charge.png');
         await tUp(2);
         charged = hu2 ? hu2.chg : null;
+        if (hu2 && gt0 !== null && hu2.t > gt0) console.log('chgPerGameSec=', Math.round(charged / (hu2.t - gt0) * 100) / 100, 'gameDt=', Math.round((hu2.t - gt0) * 100) / 100);
         break;
     } else {
         // 공쪽으로 스틱
