@@ -32,7 +32,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const [hint, setHint] = useState('');
     const hintSeq = useRef(0);
     const flash = (t: string) => { const n = ++hintSeq.current; setHint(t); setTimeout(() => { if (hintSeq.current === n) setHint(''); }, 1600); };
-    const paused = useRef(false); const [ps, setPs] = useState(false);
+    const paused = useRef(false); const [ps, setPs] = useState(false); const [glLost, setGlLost] = useState(false); const glLostRef = useRef(false); const [fatalErr, setFatalErr] = useState(false);
     const setPause = (v: boolean) => { paused.current = v; setPs(v); if (v) { const I = inp.current; I.mx = 0; I.mz = 0; I.shootDown = false; for (const k in I.keys) I.keys[k] = false; } };
     useEffect(() => { const h = () => { if (document.hidden) setPause(true); }; document.addEventListener('visibilitychange', h); return () => document.removeEventListener('visibilitychange', h); }, []);
 
@@ -42,7 +42,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         const g = hud.current!.getContext('2d')!;
         const kd = (e: KeyboardEvent) => {
             const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
-            if (k === 'p' && !e.repeat) { setPause(!paused.current); return; }
+            if (k === 'p' && !e.repeat) { if (!glLostRef.current) setPause(!paused.current); return; }
             if (!inp.current.keys[k]) { if (k === ' ' || k === 'j') inp.current.passPressed = true; if (k === 'l' || k === 'q') inp.current.switchPressed = true; if (k === 'k') inp.current.shootDown = true; }
             inp.current.keys[k] = true;
         };
@@ -76,14 +76,18 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                 const bs = new T.Mesh(new T.CircleGeometry(0.28, 12), blob); bs.rotation.x = -Math.PI / 2; bs.position.y = 0.012; scene.add(bs);
                 const cam = new T.PerspectiveCamera(52, CW / CH, 0.5, 200); let cx = W / 2, cz = L - 4;
                 setMsg('');
+                renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLostRef.current = true; setGlLost(true); if (!paused.current) setPause(true); });
+                renderer.domElement.addEventListener('webglcontextrestored', () => { glLostRef.current = false; setGlLost(false); });
                 let last = performance.now(), endT = 0;
+                let frameErr = false;
                 const frame = (now: number) => {
-                    if (!alive) return; const dt = Math.min((now - last) / 1000, 0.1); last = now;
+                    if (!alive) return; try {
+                    const dt = Math.min((now - last) / 1000, 0.1); last = now;
                     const I = inp.current; const k = I.keys;
                     const kx = (k['arrowright'] || k['d'] ? 1 : 0) - (k['arrowleft'] || k['a'] ? 1 : 0), kz = (k['arrowdown'] || k['s'] ? 1 : 0) - (k['arrowup'] || k['w'] ? 1 : 0);
                     let mx = I.mx, mz = I.mz; if (kx || kz) { mx = kx; mz = kz; }
                     const inputObj: Input = { mx, mz, passPressed: I.passPressed, shootDown: I.shootDown, shootReleased: I.shootReleased, switchPressed: I.switchPressed };
-                    if (!paused.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
+                    if (!paused.current && !glLostRef.current) { if (inputObj.shootReleased && m.state === 'play' && m.ball.owner !== m.players[m.humanId]) flash('공이 없어 슛이 안 나갔다'); if (FASTN > 1) { for (let i = 0; i < FASTN && m.state !== 'end'; i++) step(m, 1 / 60, i === 0 ? inputObj : { ...inputObj, passPressed: false, shootReleased: false, switchPressed: false }); } else step(m, dt, inputObj); } I.passPressed = false; I.shootReleased = false; I.switchPressed = false;
                     const hu = m.players[m.humanId]; const want = m.ball.owner === hu ? '패스' : '태클'; if (passBtn.current && passBtn.current.textContent !== want) passBtn.current.textContent = want;
                     if (m.rec.tackles > prevTk.current) { prevTk.current = m.rec.tackles; flash('태클로 공을 빼앗았다'); } // 태클 성공 피드백(엔진은 성공 시 rec.tackles만 증가)
                     // 태클 시도 추적: 시작은 조작 선수의 런지 상승 에지, 종료는 시도별 선수 자신의 하강 에지(선수별 직전값 맵). 전환/연속 시도가 겹쳐도 시도 단위로 독립 판정
@@ -104,6 +108,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     drawHud(g, m, stick.current, I);
                     if (m.state === 'end') { endT += dt; if (endT > 1.5 && !finished.current) { finished.current = true; onFinish({ score: [...m.score] as [number, number], rec: { ...m.rec, sdg: { n: m.rec.sdg?.n ?? 0, w: m.rec.sdg?.w ?? 0, r: m.rec.sdg?.r ?? 0, c: shotCancel.current } }, rating: rating(m) }); return; } }
                     raf = requestAnimationFrame(frame);
+                    } catch (e) { if (!frameErr) { frameErr = true; console.error('[frame]', e); setFatalErr(true); } }
                 };
                 raf = requestAnimationFrame(frame);
             } catch (e) { setMsg('3D 표시 실패: ' + String(e)); }
@@ -125,10 +130,16 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
         {ps && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 5, borderRadius: 12, background: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
             <div style={{ fontWeight: 800, fontSize: 22 }}>일시정지</div>
             <div style={{ fontSize: 13, lineHeight: 1.5, textAlign: 'center', wordBreak: 'keep-all', padding: '0 14px', opacity: 0.9 }}>왼쪽 화면을 누른 채 끌어서 이동. 패스 버튼은 패스와 태클, 슛 버튼은 오른쪽 아래. 슛은 누르고 있으면 힘이 찬다.</div>
-            <button type="button" onClick={() => setPause(false)} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16 }}>계속하기</button>
+            <button type="button" disabled={glLost} onClick={() => { if (!glLostRef.current) setPause(false); }} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16, ...(glLost ? { opacity: 0.45, cursor: 'default' } : {}) }}>{glLost ? '복구 대기 중' : '계속하기'}</button>
             {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '8px 20px', borderRadius: 22, border: '1px solid rgba(255,255,255,.7)', background: 'transparent', color: '#fff', fontSize: 14 }}>경기 나가기</button>}
         </div>}
         {msg && <div style={{ position: 'absolute', left: 0, right: 0, top: '45%', textAlign: 'center', color: '#fff', fontWeight: 700, padding: 12 }}>{msg}</div>}
+        {glLost && !fatalErr && <div style={{ position: 'absolute', left: '6%', right: '6%', top: '12%', textAlign: 'center', pointerEvents: 'none', zIndex: 6 }}><span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 16, background: 'rgba(0,0,0,.78)', color: '#fff', fontWeight: 700, fontSize: 14 }}>그래픽 연결이 끊겨 복구를 시도하고 있습니다</span></div>}
+        {fatalErr && <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', boxSizing: 'border-box', zIndex: 7, borderRadius: 12, background: 'rgba(0,0,0,.78)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', textAlign: 'center', padding: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 20 }}>화면 표시에 문제가 생겼습니다</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, wordBreak: 'keep-all', opacity: 0.9 }}>이 경기는 여기서 중단됐습니다.{onQuit ? ' 경기를 나갔다가 다시 들어와 주세요.' : ' 페이지를 새로고침해 주세요.'}</div>
+            {onQuit && <button type="button" onClick={() => { if (window.confirm('경기를 나가면 이 경기는 처음부터 다시 해야 한다. 나갈까?')) onQuit(); }} style={{ padding: '10px 26px', borderRadius: 22, border: 'none', background: '#ffd23d', color: '#222', fontWeight: 700, fontSize: 16 }}>경기 나가기</button>}
+        </div>}
         {hint && !msg && !ps && <div style={{ position: 'absolute', left: 0, right: 0, bottom: '42%', textAlign: 'center', pointerEvents: 'none', zIndex: 4 }}><span style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 16, background: 'rgba(0,0,0,.65)', color: '#ffd23d', fontWeight: 700, fontSize: 14, maxWidth: '86%' }}>{hint}</span></div>}
         <button type="button" ref={passBtn} aria-label="패스 또는 태클" style={btn({ right: '22%', bottom: '4%', width: '17%', aspectRatio: '1', background: 'rgba(40,110,200,.75)' })}
             onPointerDown={e => { e.preventDefault(); inp.current.passPressed = true; }}>패스</button>
