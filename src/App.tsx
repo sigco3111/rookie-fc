@@ -174,12 +174,12 @@ export function App() {
                     {y.length > 0 && <>
                         <p className="rs-hint rs-mid">유스 시즌</p>
                         <table className="rs-table"><thead><tr><th>시즌</th><th>평균 평점</th><th>골</th><th>도움</th><th>결과</th></tr></thead>
-                            <tbody>{y.map(r => <tr key={r.n}><td>{r.n}시즌</td><td>{r.avg.toFixed(1)}</td><td>{r.g ?? '-'}</td><td>{r.a ?? '-'}</td><td>{r.ok ? '승격' : '미달'}</td></tr>)}</tbody></table>
+                            <tbody>{y.map((r, i) => <tr key={i}><td>{r.n}시즌</td><td>{r.avg.toFixed(1)}</td><td>{r.g ?? '-'}</td><td>{r.a ?? '-'}</td><td>{r.ok ? '승격' : '미달'}</td></tr>)}</tbody></table>
                     </>}
                     {h.length > 0 && <>
                         <p className="rs-hint rs-mid">1군 시즌</p>
                         <table className="rs-table"><thead><tr><th>시즌</th><th>순위</th><th>승점</th><th>골</th><th>도움</th></tr></thead>
-                            <tbody>{h.map(r => <tr key={r.n}><td>{r.n}시즌</td><td>{r.rk}위</td><td>{r.pts}</td><td>{r.g}</td><td>{r.a}</td></tr>)}</tbody></table>
+                            <tbody>{h.map((r, i) => <tr key={i}><td>{r.n}시즌</td><td>{r.rk}위</td><td>{r.pts}</td><td>{r.g}</td><td>{r.a}</td></tr>)}</tbody></table>
                     </>}
                 </>;
             })()}
