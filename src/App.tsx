@@ -159,6 +159,7 @@ export function App() {
             {(() => {
                 const y = s.yhist ?? [], h = s.hist ?? [];
                 const yg = y.reduce((a, c) => a + (c.g ?? 0), 0), ya = y.reduce((a, c) => a + (c.a ?? 0), 0);
+                const unrec = y.some(r => r.g === undefined || r.a === undefined);
                 const hg = h.reduce((a, c) => a + c.g, 0), ha = h.reduce((a, c) => a + c.a, 0);
                 const inYouth = ['home', 'result', 'eval'].includes(s.phase);
                 const cg = inYouth ? (s.sg ?? 0) : 0, ca = inYouth ? (s.sa ?? 0) : 0;
@@ -170,6 +171,7 @@ export function App() {
                         <div className="rs-tile"><b>{ya + ha + ca + la}</b><small>통산 도움</small></div>
                         <div className="rs-tile"><b>{s.attempts}</b><small>유스 도전 (계승 +{s.legacy})</small></div>
                     </div>
+                    {unrec && <p className="rs-hint">골·도움 합계는 기록이 남은 경기 기준이다. 일부 이전 시즌은 기록이 없다.</p>}
                     {y.length === 0 && h.length === 0 && <p className="rs-hint">아직 끝난 시즌이 없다. 시즌이 끝날 때마다 기록이 쌓인다.</p>}
                     {y.length > 0 && <>
                         <p className="rs-hint rs-mid">유스 시즌</p>

@@ -27,7 +27,7 @@ const evl = async (expr) => (await send('Runtime.evaluate', { expression: expr, 
 await send('Page.enable');
 await sleep(2500);
 const save = { v: 1, phase: 'home', name: '기록실시험', pos: 'FW', stats: { shoot: 74, pass: 53, dribble: 72, defense: 47, speed: 73 }, season: 2, game: 0, trust: 66, ratings: [], trained: false, last: null, evalRes: null, attempts: 2, legacy: 3, league: null, sg: 1, sa: 0, sgn: 1,
-    yhist: [{ n: 1, avg: 6.85, ok: false, g: 3, a: 1 }],
+    yhist: [{ n: 1, avg: 6.85, ok: false, g: 3, a: 1 }, { n: 2, avg: 6.1, ok: false }],
     hist: [{ n: 1, rk: 4, pts: 21, g: 9, a: 5 }, { n: 2, rk: 1, pts: 31, g: 14, a: 7 }] };
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('rookie-soccer.v1', JSON.stringify(${JSON.stringify(save)}))` });
 await send('Page.navigate', { url: 'http://127.0.0.1:${PORT}/verify.html?case=flow'.replace('${PORT}', String(PORT)) }); await sleep(4000);
@@ -36,9 +36,9 @@ await sleep(800);
 const res = await evl(`(() => { const t = document.body.innerText; return {
     hasTitle: t.includes('기록실'), hasTotal: t.includes('통산 골'), total: (t.match(/통산 골/)||[]).length,
     youthRow: t.includes('1시즌') && t.includes('6.8'), proRows: (t.match(/시즌/g)||[]).length,
-    hasRank1: t.includes('1위'), hasPts31: t.includes('31'),
+    hasRank1: t.includes('1위'), hasPts31: t.includes('31'), caveat: t.includes('기록이 남은 경기 기준'), dashRow: t.includes('-'),
     tiles: [...document.querySelectorAll('.rs-tile b')].map(x => x.textContent) }; })()`);
 const shot = await send('Page.captureScreenshot', { format: 'png' });
 if (shot.result?.data) await writeFile(OUT, Buffer.from(shot.result.data, 'base64'));
-console.log(JSON.stringify({ ok: !!(clicked && res && res.hasTitle && res.hasTotal && res.hasRank1 && res.hasPts31), clicked, ...res }));
+console.log(JSON.stringify({ ok: !!(clicked && res && res.hasTitle && res.hasTotal && res.hasRank1 && res.hasPts31 && res.caveat), clicked, ...res }));
 chrome.kill(); server.close(); process.exit(0);
