@@ -49,7 +49,7 @@ let prevT = -1;
 
 const stickO = await ev(`(() => { const cs = [...document.querySelectorAll('canvas')]; const c = cs[cs.length-1]; const r = c.getBoundingClientRect(); return [r.x + r.width*0.3, r.y + r.height*0.55]; })()`);
 await tDown(1, stickO[0], stickO[1]);
-let holdingShoot = false, shootPressAt = 0, shots = 0, saves = 0;
+let holdingShoot = false, shootPressAt = 0, shots = 0, saves = 0, remounts = 0;
 // 강제조건(주입): 내 선수에게 공을 주고 골대(z=0) 앞 12m에 배치. 포즈 시각 확인 전용, 판정은 실제 엔진 진행.
 const stage = () => ev(`(() => { const m = window.__m; const H = m.players[m.humanId]; m.state = 'play';
     H.x = 15 + Math.random() * 6; H.z = 12; H.vx = H.vz = 0; H.stun = 0; H.noPick = 0; H.lunge = 0; H.lungeCd = 0;
@@ -80,9 +80,10 @@ while (Date.now() - t0 < DUR * 1000 && saves < 3) {
         // 슛 후 2.5초간 GK 캐치/튕겨냄 감시 → 감지 시 250ms 뒤 캡처
         const w0 = Date.now();
         while (Date.now() - w0 < 2500) {
-            const g = await ev(`JSON.stringify((() => { if (!window.__m) return null; const gk = window.__m.players.find(p => p.id === ${gkId}); return { ow: window.__m.ball.owner ? window.__m.ball.owner.id : -1, np: gk.noPick, bx: window.__m.ball.x, bz: window.__m.ball.z }; })())`);
+            const g = await ev(`JSON.stringify((() => { if (!window.__m) return null; const had = '__lastM' in window; const same = had ? window.__lastM === window.__m : true; window.__lastM = window.__m; const gk = window.__m.players.find(p => p.id === ${gkId}); return { same, t: window.__m.t, ow: window.__m.ball.owner ? window.__m.ball.owner.id : -1, np: gk.noPick, bx: window.__m.ball.x, bz: window.__m.ball.z }; })())`);
             if (!g) { await sleep(120); continue; }
             const st = JSON.parse(g);
+            if (st.same === false) { remounts++; await log({ type: 'remount-detected', t: st.t }); }
             if (st.ow === gkId || st.np > 0.05) {
                 saves++; await sleep(250);
                 const shot = await send('Page.captureScreenshot', { format: 'png' });
@@ -96,6 +97,6 @@ while (Date.now() - t0 < DUR * 1000 && saves < 3) {
     await sleep(30);
 }
 await tUp(1).catch(() => {});
-await log({ type: 'done', shots, saves });
-console.log('done', OUT, 'shots', shots, 'saves', saves);
+await log({ type: 'done', shots, saves, remounts });
+console.log('done', OUT, 'shots', shots, 'saves', saves, 'remounts', remounts);
 chrome.kill(); server.close(); process.exit(0);
