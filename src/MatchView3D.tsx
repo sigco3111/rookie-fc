@@ -104,13 +104,15 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                         const ow = m.ball.owner ? m.ball.owner.id : -1;
                         const bSp = Math.hypot(m.ball.vx, m.ball.vz);
                         m.players.forEach(p => { if (p.role !== 'GK') return; const np = prevGkNp.current[p.id] ?? 0;
-                            if (!gkAnim.current[p.id] && ((ow === p.id && prevBallOw.current !== p.id && p.noPick <= 0 && prevBallSp.current >= 8) || p.noPick > np + 0.01)) gkAnim.current[p.id] = { side: m.ball.x >= p.x ? 1 : -1, t0: now };
+                            // 캐치: 빠른 공(≥8)의 소유가 GK로 바뀐 순간. 튕겨냄: noPick 상승 + 공이 위로 튐(vy>0.8) — 킥의 noPick 0.4와 구분
+                            if (!gkAnim.current[p.id] && ((ow === p.id && prevBallOw.current !== p.id && p.noPick <= 0 && prevBallSp.current >= 8) || (p.noPick > np + 0.01 && m.ball.vy > 0.8))) gkAnim.current[p.id] = { side: m.ball.x >= p.x ? 1 : -1, t0: now };
                             prevGkNp.current[p.id] = p.noPick; });
                         prevBallOw.current = ow; prevBallSp.current = bSp;
                     }
                     m.players.forEach((p, i) => {
                         const sp = Math.hypot(p.vx, p.vz); const ga = p.role === 'GK' ? gkAnim.current[p.id] : undefined;
-                        if (ga) { if (now - ga.t0 < 700) rigs[i].savePose(p.x, p.z, p.h, ga.side, (now - ga.t0) / 700); else { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
+                        if (ga && !p.kick) { if (now - ga.t0 < 700) rigs[i].savePose(p.x, p.z, p.h, ga.side, (now - ga.t0) / 700); else { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
+                        else if (ga) { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); }
                         else { rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; }
                         shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
