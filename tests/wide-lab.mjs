@@ -33,7 +33,7 @@ async function probe(name, wpx, hpx, port) {
     }
     let r = { name, started };
     if (started) {
-        await sleep(2500);
+        await sleep(2500); await ev('scrollTo(0,0)'); await sleep(300);
         r.view = JSON.parse(await ev(`(() => { const c = document.querySelector('canvas'); const w = document.querySelector('.rs-wrap'); return JSON.stringify({ vw: innerWidth, vh: innerHeight, cw: c.width, ch: c.height, aspect: Math.round(c.width / c.height * 100) / 100, wrapW: w ? Math.round(w.getBoundingClientRect().width) : 0 }) })()`));
         const shot = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(`/tmp/wide-${name}.png`, Buffer.from(shot.result.data, 'base64'));
@@ -42,5 +42,5 @@ async function probe(name, wpx, hpx, port) {
 }
 const wide = await probe('pc', 1280, 800, 9289);
 const mobile = await probe('mobile', 390, 760, 9290);
-console.log(JSON.stringify({ wide, mobile, wideOk: wide.view && wide.view.aspect >= 1.7 && wide.view.cw >= 1100, mobileOk: mobile.view && mobile.view.cw === 390 && mobile.view.ch === 590 }));
+console.log(JSON.stringify({ wide, mobile, wideOk: wide.view && wide.view.aspect >= 1.7 && wide.view.ch + 190 <= wide.view.vh + 24, mobileOk: mobile.view && mobile.view.cw === 390 && mobile.view.ch === 590 }));
 server.close(); process.exit(0);

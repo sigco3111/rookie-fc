@@ -17,8 +17,10 @@ function computeSz(): Sz {
     if (typeof window === 'undefined') return { w: CW, h: CH, wide: false };
     const vw = window.innerWidth, vh = window.innerHeight;
     if (vw >= 700 && vw / vh >= 1.3) {
+        // 헤더·안내 영역(약 190px)을 남겨 스크롤 없이 경기 전체와 조작 버튼이 보이게 한다
+        const hMax = Math.max(400, vh - 190);
         let w = Math.min(Math.round(vw * 0.98), 1600); let h = Math.round(w * 9 / 16);
-        if (h > Math.round(vh * 0.94)) { h = Math.round(vh * 0.94); w = Math.round(h * 16 / 9); }
+        if (h > hMax) { h = hMax; w = Math.round(h * 16 / 9); }
         return { w, h, wide: true };
     }
     return { w: CW, h: CH, wide: false };
