@@ -53,6 +53,9 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
             try {
                 renderer = new T.WebGLRenderer({ canvas: gl.current!, antialias: true });
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(CW, CH, false);
+                // 컨텍스트 손실 처리는 생성 직후에 건다: 모델 로딩(await loadAssets) 중에 끊겨도 안내 배너·일시정지·복구가 동작해야 한다
+                renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLostRef.current = true; setGlLost(true); if (!paused.current) setPause(true); });
+                renderer.domElement.addEventListener('webglcontextrestored', () => { glLostRef.current = false; setGlLost(false); });
                 try { const ff = new FontFace('RSHud', `url(${hudUrl})`); await ff.load(); document.fonts.add(ff); } catch {}
                 const A = await loadAssets(); if (!alive) return;
                 const scene = new T.Scene(); scene.background = new T.Color(0x86b9e0); scene.fog = new T.Fog(0x86b9e0, 55, 110);
@@ -77,8 +80,6 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                 const bs = new T.Mesh(new T.CircleGeometry(0.28, 12), blob); bs.rotation.x = -Math.PI / 2; bs.position.y = 0.012; scene.add(bs);
                 const cam = new T.PerspectiveCamera(52, CW / CH, 0.5, 200); let cx = W / 2, cz = L - 4;
                 setMsg('');
-                renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLostRef.current = true; setGlLost(true); if (!paused.current) setPause(true); });
-                renderer.domElement.addEventListener('webglcontextrestored', () => { glLostRef.current = false; setGlLost(false); });
                 let last = performance.now(), endT = 0;
                 let frameErr = false;
                 const frame = (now: number) => {
