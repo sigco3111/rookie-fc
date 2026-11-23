@@ -9,7 +9,7 @@ export interface Player {
 }
 export interface Ball { x: number; z: number; y: number; vx: number; vz: number; vy: number; owner: Player | null; last: Player | null; lastTeam: 0 | 1; lastPassFrom: Player | null; lastPassT: number }
 export interface Input { mx: number; mz: number; passPressed: boolean; shootDown: boolean; shootReleased: boolean; switchPressed: boolean }
-export interface Rec { goals: number; assists: number; shots: number; shotsOn: number; passAtt: number; passOk: number; tackles: number; lost: number }
+export interface Rec { goals: number; assists: number; shots: number; shotsOn: number; passAtt: number; passOk: number; tackles: number; lost: number; sdg?: { n: number; w: number; r: number; c?: number } } // sdg: 슛 진단 — n 무소유 릴리스, w 충전 중 소유 상실 후 릴리스, r 킥 동작 방출 시점 소유 상실, c 취소(UI 병합)
 export interface Match {
     players: Player[]; ball: Ball; score: [number, number]; t: number; half: number; halfLen: number; state: 'kickoff' | 'play' | 'goal' | 'halftime' | 'end';
     stateT: number; kickTeam: 0 | 1; humanId: number; teamControl: boolean; rec: Rec; charge: number; events: string[]; pendingPass: { from: Player; to: Player; t: number } | null; banner: string; switchCd: number;
@@ -35,7 +35,7 @@ export function makeMatch(me: Stats, pos: Pos, oppStr: number, teamControl: bool
     const hi = pos === 'FW' ? 6 : pos === 'MF' ? 4 : 1;
     players[hi].st = { ...me }; players[hi].human = true;
     const m: Match = { players, ball: { x: W / 2, z: L / 2, y: 0, vx: 0, vz: 0, vy: 0, owner: null, last: null, lastTeam: 0, lastPassFrom: null, lastPassT: -9 }, score: [0, 0], t: 0, half: 1, halfLen,
-        state: 'kickoff', stateT: 0, kickTeam: 0, humanId: hi, teamControl, rec: { goals: 0, assists: 0, shots: 0, shotsOn: 0, passAtt: 0, passOk: 0, tackles: 0, lost: 0 }, charge: 0, events: [], pendingPass: null, banner: '킥오프', switchCd: 0 };
+        state: 'kickoff', stateT: 0, kickTeam: 0, humanId: hi, teamControl, rec: { goals: 0, assists: 0, shots: 0, shotsOn: 0, passAtt: 0, passOk: 0, tackles: 0, lost: 0, sdg: { n: 0, w: 0, r: 0 } }, charge: 0, events: [], pendingPass: null, banner: '킥오프', switchCd: 0 };
     resetKickoff(m, 0);
     return m;
 }
@@ -95,7 +95,7 @@ function bestPassTarget(m: Match, p: Player, dirx: number, dirz: number, useDir:
 }
 function releaseKick(m: Match, p: Player) {
     const k = p.kick!; const b = m.ball; k.done = true;
-    if (b.owner !== p && dist(p, b) > 1.5) return;
+    if (b.owner !== p && dist(p, b) > 1.5) { if (p.human && k.type === 'shoot') (m.rec.sdg ??= { n: 0, w: 0, r: 0 }).r++; return; }
     b.owner = null; b.last = p; b.lastTeam = p.team; p.noPick = 0.4;
     if (k.type === 'shoot') {
         const v = 12 + k.power * 14; b.vx = k.dx * v; b.vz = k.dz * v; b.vy = k.power > 0.75 ? 2.5 + (Math.random()) * 2 : 0.5 * k.power;
@@ -124,6 +124,7 @@ function update(m: Match, dt: number, inp: Input) {
     const H = m.players[m.humanId];
     if (inp.shootDown && b.owner === H && !H.kick) m.charge = Math.min(1, m.charge + dt * 1.1); else if (!inp.shootDown && !inp.shootReleased) m.charge = 0;
     if (inp.shootReleased && b.owner === H && !H.kick && m.state !== 'goal') { shoot(m, H, Math.max(0.35, m.charge), inp.mz > 0.3 && H.team === 0 ? 0 : inp.mx); m.charge = 0 }
+    else if (inp.shootReleased && m.state === 'play' && b.owner !== H) { const sd = (m.rec.sdg ??= { n: 0, w: 0, r: 0 }); if (m.charge > 0) sd.w++; else sd.n++; m.charge = 0 }
     if (inp.passPressed && !H.kick) {
         if (b.owner === H) {
             const useDir = Math.hypot(inp.mx, inp.mz) > 0.3; const t = bestPassTarget(m, H, inp.mx, inp.mz, useDir);
