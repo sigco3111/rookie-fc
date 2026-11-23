@@ -28,6 +28,7 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
     const finished = useRef(false);
     const shotCancel = useRef(0); const prevTk = useRef(0); const lgPrev = useRef<Record<number, number>>({}); const tAtts = useRef<{ pid: number; tk: number; ow: number; gt0: number }[]>([]);
     const passBtn = useRef<HTMLButtonElement>(null); const lastOpp = useRef<{ id: number; gt: number }>({ id: -1, gt: -9 }); const lastPass = useRef<{ fromId: number; gt: number }>({ fromId: -1, gt: -9 });
+    const gkAnim = useRef<Record<number, { side: number; t0: number }>>({}); const prevBallOw = useRef(-1); const prevGkNp = useRef<Record<number, number>>({}); const prevBallSp = useRef(0);
     const [msg, setMsg] = useState('3D 모델 불러오는 중');
     const [hint, setHint] = useState('');
     const hintSeq = useRef(0);
@@ -99,8 +100,19 @@ export function MatchView({ stats, pos, oppStr, teamControl, halfLen, onFinish, 
                     tAtts.current = tAtts.current.filter(a => { const p = m.players[a.pid]; const pv = prevMap[a.pid] ?? 0; if (p.lunge <= 0 && pv > 0) { if (a.ow >= 0 && m.rec.tackles === a.tk) { const nowOw = m.ball.owner ? m.ball.owner.id : -1; const passedByCarrier = (m.pendingPass && m.pendingPass.from && m.pendingPass.from.id === a.ow) || (lastPass.current.fromId === a.ow && lastPass.current.gt >= a.gt0 - 0.15); if (passedByCarrier) flash('상대가 먼저 패스했다'); else if (nowOw === a.ow) flash('태클이 빗나갔다'); else if (nowOw === -1 && Math.hypot(m.ball.vx, m.ball.vz) < 6) flash('공이 루즈볼이 됐다'); } return false; } return true; });
                     m.players.forEach(p => { prevMap[p.id] = p.lunge; });
                     if (DBG) { (window as any).__m = m; (window as any).__atts = tAtts.current.map(a => a.pid + ':' + a.tk + ':' + a.ow); (window as any).__hu = { x: hu.x, z: hu.z, t: m.t, state: m.state, owner: m.ball.owner ? m.ball.owner.id : -1, hid: m.humanId, mx: I.mx, mz: I.mz, sd: I.shootDown, pa: m.rec.passAtt, po: m.rec.passOk, gl: m.rec.goals, tk: m.rec.tackles, bx: m.ball.x, bz: m.ball.z, lng: hu.lunge, sdn: m.rec.sdg?.n ?? 0, sdw: m.rec.sdg?.w ?? 0, sdr: m.rec.sdg?.r ?? 0, sdc: shotCancel.current, sh: m.rec.shots, chg: Math.round(m.charge * 100) / 100 }; }
+                    { // GK 선방 동작 트리거(표시 전용, 판정 무변경): 캐치=공 소유가 GK로 바뀐 순간, 튕겨냄=엔진이 튕겨낼 때 GK에 거는 noPick 상승
+                        const ow = m.ball.owner ? m.ball.owner.id : -1;
+                        const bSp = Math.hypot(m.ball.vx, m.ball.vz);
+                        m.players.forEach(p => { if (p.role !== 'GK') return; const np = prevGkNp.current[p.id] ?? 0;
+                            if (!gkAnim.current[p.id] && ((ow === p.id && prevBallOw.current !== p.id && p.noPick <= 0 && prevBallSp.current >= 8) || p.noPick > np + 0.01)) gkAnim.current[p.id] = { side: m.ball.x >= p.x ? 1 : -1, t0: now };
+                            prevGkNp.current[p.id] = p.noPick; });
+                        prevBallOw.current = ow; prevBallSp.current = bSp;
+                    }
                     m.players.forEach((p, i) => {
-                        const sp = Math.hypot(p.vx, p.vz); rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; shadows[i].position.x = p.x; shadows[i].position.z = p.z;
+                        const sp = Math.hypot(p.vx, p.vz); const ga = p.role === 'GK' ? gkAnim.current[p.id] : undefined;
+                        if (ga) { if (now - ga.t0 < 700) rigs[i].savePose(p.x, p.z, p.h, ga.side, (now - ga.t0) / 700); else { delete gkAnim.current[p.id]; rigs[i].update(dt, p.x, p.z, p.h, sp, -1); } }
+                        else { rigs[i].update(dt, p.x, p.z, p.h, sp, p.kick ? Math.min(1, p.kick.t / 0.42) : -1); rigs[i].holder.rotation.x = p.lunge > 0 ? 0.5 * (p.lunge / 0.3) : 0; }
+                        shadows[i].position.x = p.x; shadows[i].position.z = p.z;
                     });
                     ring.position.x = hu.x; ring.position.z = hu.z; arrow.position.set(hu.x, 2.5 + Math.sin(now / 200) * 0.1, hu.z);
                     const b = m.ball; ball.position.set(b.x, 0.22 + b.y, b.z); bs.position.x = b.x; bs.position.z = b.z; ball.rotation.x += b.vz * dt * 3; ball.rotation.z -= b.vx * dt * 3;
