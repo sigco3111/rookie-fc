@@ -30,6 +30,12 @@
 | --- | --- |
 | ![결과 화면](docs/screenshots/result-delegate.png) | ![기록실](docs/screenshots/records-delegate.png) |
 
+## 기술 노트
+- React 19 + TypeScript + Vite. `npm run build`가 docs/에 정적 파일을 만들고 GitHub Pages가 그대로 서빙한다.
+- 경기는 three.js(0.160)로 그리는 자체 7대7 엔진(전후반 각 70초). 이동·패스·슛·태클·골키퍼와 평점 집계를 매 프레임 계산한다.
+- 진행 저장은 localStorage(키 `rookie-soccer.v1`) 하나뿐이며 서버가 없다. 홈의 '저장 백업·복구'로 내보내기·가져오기가 가능하다.
+- HUD 한글은 Noto Sans KR 부분집합(hud.woff)만 싣는다.
+
 ## 에셋과 출처
 - 경기 선수: Kenney Animated Characters Protagonists (CC0), https://kenney.nl
 - 육성 화면 선수: Kenney Mini Characters (CC0, GLB 판), https://kenney.nl
